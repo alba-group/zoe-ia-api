@@ -1,6 +1,3 @@
-import webbrowser
-from urllib.parse import quote_plus
-
 from core.analyzer import analyze_text
 from core.thinker import think_about_message
 from core.responder import build_final_response
@@ -22,6 +19,7 @@ from core.context import (
 )
 from core.web_tool import should_use_web, build_web_reply
 from core.code_tool import should_use_code_tool, build_code_result
+from core.image_tool import should_use_image_tool, generate_image_reply
 from core.llm_client import create_llm_client, build_zoe_system_prompt
 
 
@@ -82,16 +80,6 @@ def _greeting_reply(memory: dict) -> str:
         return f"Salut {name}. Je suis contente de te revoir."
 
     return "Salut. Je suis contente de te revoir."
-
-
-def _open_google_search(query: str) -> None:
-    url = f"https://www.google.com/search?q={quote_plus(query)}"
-    webbrowser.open(url)
-
-
-def _open_youtube_search(query: str) -> None:
-    url = f"https://www.youtube.com/results?search_query={quote_plus(query)}"
-    webbrowser.open(url)
 
 
 def _save_exchange(
@@ -489,87 +477,6 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    # INTERNET SIMPLE (ancien mode navigateur)
-    if (
-        lower.startswith("quelle temp")
-        or lower.startswith("quelle meteo")
-        or lower.startswith("quelle météo")
-        or lower.startswith("quel temps")
-        or lower.startswith("météo ")
-        or lower.startswith("meteo ")
-        or lower.startswith("temps ")
-    ):
-        _open_google_search(text)
-        reply = f"Je t'ouvre une recherche Google pour : {text}"
-        _save_exchange(memory, text, reply, "unknown", "web", "precise", "clarify")
-        return {
-            "emotion": "unknown",
-            "precision": "precise",
-            "topic": "web",
-            "intent": "clarify",
-            "reply": reply,
-        }
-
-    if (
-        lower.startswith("recherche ")
-        or lower.startswith("cherche ")
-        or lower.startswith("cherche-moi ")
-        or lower.startswith("recherche moi ")
-    ):
-        query = text
-        replacements = [
-            "recherche-moi ",
-            "recherche moi ",
-            "recherche ",
-            "cherche-moi ",
-            "cherche moi ",
-            "cherche ",
-        ]
-        for prefix in replacements:
-            if lower.startswith(prefix):
-                query = text[len(prefix):].strip()
-                break
-
-        if query:
-            _open_google_search(query)
-            reply = f"Je lance une recherche Google pour : {query}"
-            _save_exchange(memory, text, reply, "unknown", "web", "precise", "clarify")
-            return {
-                "emotion": "unknown",
-                "precision": "precise",
-                "topic": "web",
-                "intent": "clarify",
-                "reply": reply,
-            }
-
-    if (
-        lower.startswith("youtube ")
-        or lower.startswith("cherche sur youtube ")
-        or lower.startswith("mets sur youtube ")
-    ):
-        query = text
-        replacements = [
-            "cherche sur youtube ",
-            "mets sur youtube ",
-            "youtube ",
-        ]
-        for prefix in replacements:
-            if lower.startswith(prefix):
-                query = text[len(prefix):].strip()
-                break
-
-        if query:
-            _open_youtube_search(query)
-            reply = f"Je t'ouvre YouTube pour : {query}"
-            _save_exchange(memory, text, reply, "unknown", "web", "precise", "clarify")
-            return {
-                "emotion": "unknown",
-                "precision": "precise",
-                "topic": "web",
-                "intent": "clarify",
-                "reply": reply,
-            }
-
     return None
 
 
@@ -587,7 +494,41 @@ def process_user_message(user_input: str, memory: dict) -> dict:
     if direct_result is not None:
         return direct_result
 
-    # 2. Outil code
+    # 2. Outil image
+    if should_use_image_tool(text):
+        conversation = _build_conversation_history(memory)
+        image_result = generate_image_reply(
+            user_message=text,
+            conversation=conversation,
+        )
+
+        reply = image_result["reply"]
+
+        result = {
+            "emotion": image_result.get("emotion", "positive"),
+            "precision": image_result.get("precision", "precise"),
+            "topic": image_result.get("topic", "image"),
+            "intent": image_result.get("intent", "create"),
+            "reply": reply,
+            "image_url": image_result.get("image_url", ""),
+            "thought_summary": "mode image activé",
+            "strategy": "image_generation",
+            "tone": "creative",
+        }
+
+        _save_exchange(
+            memory=memory,
+            user_text=text,
+            reply=reply,
+            emotion=result["emotion"],
+            topic=result["topic"],
+            precision=result["precision"],
+            intent=result["intent"],
+        )
+
+        return result
+
+    # 3. Outil code
     if should_use_code_tool(text):
         conversation = _build_conversation_history(memory)
         code_result = build_code_result(
@@ -620,7 +561,7 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    # 3. Outil web
+    # 4. Outil web
     if should_use_web(text):
         user_name = _get_name(memory)
         conversation = _build_conversation_history(memory)
@@ -638,9 +579,9 @@ def process_user_message(user_input: str, memory: dict) -> dict:
             "topic": web_result.get("topic", "web"),
             "intent": web_result.get("intent", "clarify"),
             "reply": reply,
-            "thought_summary": "mode recherche web activé",
-            "strategy": "web_search",
-            "tone": "informative",
+            "thought_summary": web_result.get("thought_summary", ""),
+            "strategy": web_result.get("strategy", "web_search"),
+            "tone": web_result.get("tone", "informative"),
         }
 
         _save_exchange(
@@ -655,45 +596,29 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    # 4. Analyse classique
-    analysis = analyze_text(text)
+    # 5. Analyse locale
+    analysis = analyze_text(text, memory)
+    thought_summary = think_about_message(text, memory, analysis)
+    reply = build_final_response(text, memory, analysis, thought_summary)
 
-    # 5. Réflexion
-    thought = think_about_message(
-        user_input=text,
-        analysis=analysis,
-        memory=memory
-    )
-
-    # 6. Tentative LLM libre
+    # 6. Fallback LLM si la réponse locale semble trop faible
     llm_result = _call_llm_reply(text, memory)
-
-    llm_reply = None
-    if llm_result and llm_result.get("reply"):
-        llm_reply = llm_result["reply"]
-
-    # 7. Réponse finale
-    reply = build_final_response(
-        analysis=analysis,
-        model_reply=llm_reply,
-        memory=memory,
-        thought=thought
-    )
-
-    if reply.endswith("?"):
-        set_last_bot_question(memory, reply, "general_followup")
-    else:
-        clear_waiting_flag(memory)
+    if llm_result is not None:
+        reply = llm_result["reply"]
+        analysis["emotion"] = llm_result.get("emotion", analysis.get("emotion", "unknown"))
+        analysis["topic"] = llm_result.get("topic", analysis.get("topic", "general"))
+        analysis["precision"] = llm_result.get("precision", analysis.get("precision", "vague"))
+        analysis["intent"] = llm_result.get("intent", analysis.get("intent", "reflect"))
 
     result = {
         "emotion": analysis.get("emotion", "unknown"),
         "precision": analysis.get("precision", "vague"),
         "topic": analysis.get("topic", "general"),
-        "intent": analysis.get("intent", "clarify"),
+        "intent": analysis.get("intent", "reflect"),
         "reply": reply,
-        "thought_summary": thought.get("thought_summary", ""),
-        "strategy": thought.get("strategy", ""),
-        "tone": thought.get("tone", ""),
+        "thought_summary": thought_summary,
+        "strategy": analysis.get("strategy", ""),
+        "tone": analysis.get("tone", ""),
     }
 
     _save_exchange(

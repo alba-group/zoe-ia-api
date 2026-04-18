@@ -18,6 +18,16 @@ class LLMResult:
     error: str | None = None
 
 
+@dataclass
+class ImageResult:
+    ok: bool
+    image_url: str = ""
+    b64_json: str = ""
+    revised_prompt: str = ""
+    raw_response: Any | None = None
+    error: str | None = None
+
+
 class LLMClient:
     """
     Client OpenAI simple et robuste pour Zoe.
@@ -27,6 +37,7 @@ class LLMClient:
         self.api_key = os.getenv("OPENAI_API_KEY", "").strip()
         self.model_name = os.getenv("MODEL_NAME", "gpt-4o-mini").strip()
         self.web_enabled = os.getenv("WEB_ENABLED", "false").strip().lower() == "true"
+        self.image_model = os.getenv("IMAGE_MODEL", "gpt-image-1").strip()
 
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY est vide dans le fichier .env")
@@ -145,6 +156,53 @@ class LLMClient:
             conversation=conversation,
             temperature=0.2,
         )
+
+    def generate_image(
+        self,
+        prompt: str,
+        size: str = "1024x1024",
+    ) -> ImageResult:
+        """
+        Génère une image via l'API image.
+        Retourne soit une URL, soit du b64_json selon la réponse disponible.
+        """
+        try:
+            response = self.client.images.generate(
+                model=self.image_model,
+                prompt=prompt.strip(),
+                size=size,
+            )
+
+            image_url = ""
+            b64_json = ""
+            revised_prompt = ""
+
+            data = getattr(response, "data", None) or []
+            if data:
+                first = data[0]
+
+                image_url = getattr(first, "url", "") or ""
+                b64_json = getattr(first, "b64_json", "") or ""
+                revised_prompt = getattr(first, "revised_prompt", "") or ""
+
+            return ImageResult(
+                ok=bool(image_url or b64_json),
+                image_url=image_url,
+                b64_json=b64_json,
+                revised_prompt=revised_prompt,
+                raw_response=response,
+                error=None,
+            )
+
+        except Exception as e:
+            return ImageResult(
+                ok=False,
+                image_url="",
+                b64_json="",
+                revised_prompt="",
+                raw_response=None,
+                error=str(e),
+            )
 
     def _build_text_prompt(
         self,
