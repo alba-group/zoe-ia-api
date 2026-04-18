@@ -1,114 +1,14 @@
 {
-  "history": [
-    {
-      "timestamp": "2026-04-17 23:10:45",
-      "user_message": "fais-moi un script python qui trie une liste",
-      "zoe_reply": "Je n'ai pas réussi à générer le code pour le moment. Détail : Error code: 400 - {'error': {'message': \"Invalid value: 'input_text'. Supported values are: 'output_text' and 'refusal'.\", 'type': 'invalid_request_error', 'param': 'input[2].content[0]', 'code': 'invalid_value'}}",
-      "emotion": "unknown",
-      "topic": "code",
-      "precision": "precise",
-      "intent": "clarify"
-    },
-    {
-      "timestamp": "2026-04-17 23:10:45",
-      "user_message": "fais-moi un script python qui trie une liste",
-      "zoe_reply": "Je n'ai pas réussi à générer le code pour le moment. Détail : Error code: 400 - {'error': {'message': \"Invalid value: 'input_text'. Supported values are: 'output_text' and 'refusal'.\", 'type': 'invalid_request_error', 'param': 'input[2].content[0]', 'code': 'invalid_value'}}",
-      "emotion": "unknown",
-      "topic": "code",
-      "precision": "precise",
-      "intent": "clarify"
-    },
-    {
-      "timestamp": "2026-04-17 23:10:57",
-      "user_message": "comment tu t'appelles",
-      "zoe_reply": "Je m'appelle Zoé. Je suis une intelligence artificielle.",
-      "emotion": "positive",
-      "topic": "identity",
-      "precision": "precise",
-      "intent": "reflect"
-    },
-    {
-      "timestamp": "2026-04-17 23:10:57",
-      "user_message": "comment tu t'appelles",
-      "zoe_reply": "Je m'appelle Zoé. Je suis une intelligence artificielle.",
-      "emotion": "positive",
-      "topic": "identity",
-      "precision": "precise",
-      "intent": "reflect"
-    },
-    {
-      "timestamp": "2026-04-17 23:20:17",
-      "user_message": "qui est eminem",
-      "zoe_reply": "Je n'ai pas réussi à faire la recherche web pour le moment. Détail : Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}",
-      "emotion": "unknown",
-      "topic": "web",
-      "precision": "precise",
-      "intent": "clarify"
-    },
-    {
-      "timestamp": "2026-04-17 23:20:17",
-      "user_message": "qui est eminem",
-      "zoe_reply": "Je n'ai pas réussi à faire la recherche web pour le moment. Détail : Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}",
-      "emotion": "unknown",
-      "topic": "web",
-      "precision": "precise",
-      "intent": "clarify"
-    },
-    {
-      "timestamp": "2026-04-17 23:20:48",
-      "user_message": "qui est eminem",
-      "zoe_reply": "Je n'ai pas réussi à faire la recherche web pour le moment. Détail : Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}",
-      "emotion": "unknown",
-      "topic": "web",
-      "precision": "precise",
-      "intent": "clarify"
-    },
-    {
-      "timestamp": "2026-04-17 23:20:48",
-      "user_message": "qui est eminem",
-      "zoe_reply": "Je n'ai pas réussi à faire la recherche web pour le moment. Détail : Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}",
-      "emotion": "unknown",
-      "topic": "web",
-      "precision": "precise",
-      "intent": "clarify"
-    },
-    {
-      "timestamp": "2026-04-17 23:21:13",
-      "user_message": "fais-moi un script python qui trie une liste",
-      "zoe_reply": "Je n'ai pas réussi à générer le code pour le moment. Détail : Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}",
-      "emotion": "unknown",
-      "topic": "code",
-      "precision": "precise",
-      "intent": "clarify"
-    },
-    {
-      "timestamp": "2026-04-17 23:21:13",
-      "user_message": "fais-moi un script python qui trie une liste",
-      "zoe_reply": "Je n'ai pas réussi à générer le code pour le moment. Détail : Error code: 429 - {'error': {'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.', 'type': 'insufficient_quota', 'param': None, 'code': 'insufficient_quota'}}",
-      "emotion": "unknown",
-      "topic": "code",
-      "precision": "precise",
-      "intent": "clarify"
-    }
-  ],
-  "profile": {
-    "last_detected_emotion": "unknown",
-    "favorite_topic": "code",
-    "emotion_counter": {
-      "unknown": 86,
-      "negative": 11,
-      "positive": 57
-    },
-    "name": "Alba"
-  },
+  "history": [],
+  "profile": {},
   "last_emotion": "unknown",
-  "last_topic": "code",
+  "last_topic": "general",
   "context": {
-    "mode": "riddle",
-    "last_question_type": "general_followup",
-    "awaiting_user_reply": true,
-    "riddle_answer": "un piano",
-    "riddle_question": "Qu'est-ce qui a des clés mais n'ouvre aucune porte ?",
-    "last_bot_question": "Je suis là. Je vois. Tu veux m'expliquer un peu plus ce qui s'est passé ?"
+    "mode": null,
+    "last_question_type": null,
+    "awaiting_user_reply": false,
+    "riddle_answer": null,
+    "riddle_question": null,
+    "last_bot_question": null
   }
 }
