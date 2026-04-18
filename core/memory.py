@@ -12,6 +12,15 @@ DEFAULT_MEMORY = {
 }
 
 
+def _safe_default_memory() -> dict:
+    return {
+        "history": [],
+        "profile": {},
+        "last_emotion": "unknown",
+        "last_topic": "general"
+    }
+
+
 def ensure_memory_file() -> None:
     """
     Crée le fichier mémoire si absent.
@@ -23,7 +32,52 @@ def ensure_memory_file() -> None:
 
     if not os.path.exists(MEMORY_FILE):
         with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-            json.dump(DEFAULT_MEMORY, f, ensure_ascii=False, indent=2)
+            json.dump(_safe_default_memory(), f, ensure_ascii=False, indent=2)
+
+
+def _sanitize_memory(data: dict) -> dict:
+    """
+    Nettoie la structure mémoire pour éviter les valeurs invalides
+    ou les profils partiellement cassés.
+    """
+    if not isinstance(data, dict):
+        return _safe_default_memory()
+
+    memory = _safe_default_memory()
+
+    history = data.get("history", [])
+    if isinstance(history, list):
+        memory["history"] = history[-HISTORY_LIMIT:]
+
+    profile = data.get("profile", {})
+    if isinstance(profile, dict):
+        clean_profile = dict(profile)
+
+        # Nettoyage du champ name si présent
+        name = clean_profile.get("name", "")
+        if not isinstance(name, str):
+            clean_profile["name"] = ""
+        else:
+            clean_profile["name"] = name.strip()
+
+        # Nettoyage du champ emotion_counter
+        emotion_counter = clean_profile.get("emotion_counter", {})
+        if not isinstance(emotion_counter, dict):
+            clean_profile["emotion_counter"] = {}
+        else:
+            clean_profile["emotion_counter"] = emotion_counter
+
+        memory["profile"] = clean_profile
+
+    last_emotion = data.get("last_emotion", "unknown")
+    if isinstance(last_emotion, str) and last_emotion.strip():
+        memory["last_emotion"] = last_emotion.strip()
+
+    last_topic = data.get("last_topic", "general")
+    if isinstance(last_topic, str) and last_topic.strip():
+        memory["last_topic"] = last_topic.strip()
+
+    return memory
 
 
 def load_memory() -> dict:
@@ -36,13 +90,10 @@ def load_memory() -> dict:
         with open(MEMORY_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        if not isinstance(data, dict):
-            return DEFAULT_MEMORY.copy()
-
-        return data
+        return _sanitize_memory(data)
 
     except Exception:
-        return DEFAULT_MEMORY.copy()
+        return _safe_default_memory()
 
 
 def save_memory(memory: dict) -> None:
@@ -50,9 +101,10 @@ def save_memory(memory: dict) -> None:
     Sauvegarde mémoire sur disque.
     """
     ensure_memory_file()
+    clean_memory = _sanitize_memory(memory)
 
     with open(MEMORY_FILE, "w", encoding="utf-8") as f:
-        json.dump(memory, f, ensure_ascii=False, indent=2)
+        json.dump(clean_memory, f, ensure_ascii=False, indent=2)
 
 
 def add_message_to_history(
@@ -68,7 +120,6 @@ def add_message_to_history(
     """
     Ajoute un échange à l'historique.
     """
-
     item = {
         "timestamp": timestamp,
         "user_message": user_message,
@@ -80,9 +131,10 @@ def add_message_to_history(
     }
 
     history = memory.get("history", [])
-    history.append(item)
+    if not isinstance(history, list):
+        history = []
 
-    # limite mémoire courte
+    history.append(item)
     history = history[-HISTORY_LIMIT:]
 
     memory["history"] = history
@@ -94,8 +146,9 @@ def update_profile_from_analysis(memory: dict, analysis: dict) -> None:
     """
     Met à jour un petit profil utilisateur.
     """
-
     profile = memory.get("profile", {})
+    if not isinstance(profile, dict):
+        profile = {}
 
     emotion = analysis.get("emotion", "unknown")
     topic = analysis.get("topic", "general")
@@ -103,10 +156,16 @@ def update_profile_from_analysis(memory: dict, analysis: dict) -> None:
     profile["last_detected_emotion"] = emotion
     profile["favorite_topic"] = topic
 
-    # compteur émotion
     emotion_counter = profile.get("emotion_counter", {})
+    if not isinstance(emotion_counter, dict):
+        emotion_counter = {}
+
     emotion_counter[emotion] = emotion_counter.get(emotion, 0) + 1
     profile["emotion_counter"] = emotion_counter
+
+    # Nettoyage du prénom si jamais il existe
+    if "name" in profile and isinstance(profile["name"], str):
+        profile["name"] = profile["name"].strip()
 
     memory["profile"] = profile
 
@@ -115,8 +174,9 @@ def clear_memory() -> dict:
     """
     Réinitialise totalement la mémoire.
     """
-    save_memory(DEFAULT_MEMORY.copy())
-    return DEFAULT_MEMORY.copy()
+    clean = _safe_default_memory()
+    save_memory(clean)
+    return clean
 
 
 def get_last_messages(memory: dict, limit: int = 5) -> list:
@@ -124,6 +184,8 @@ def get_last_messages(memory: dict, limit: int = 5) -> list:
     Retourne les derniers échanges.
     """
     history = memory.get("history", [])
+    if not isinstance(history, list):
+        return []
     return history[-limit:]
 
 
@@ -131,4 +193,7 @@ def get_profile(memory: dict) -> dict:
     """
     Retourne le profil mémorisé.
     """
-    return memory.get("profile", {})
+    profile = memory.get("profile", {})
+    if not isinstance(profile, dict):
+        return {}
+    return profile 

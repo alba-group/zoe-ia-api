@@ -23,17 +23,76 @@ from core.image_tool import should_use_image_tool, generate_image_reply
 from core.llm_client import create_llm_client, build_zoe_system_prompt
 
 
+STRICT_CHAT_MESSAGES = {
+    "salut",
+    "salut zoe",
+    "bonjour",
+    "bonsoir",
+    "hello",
+    "coucou",
+    "merci",
+    "merci zoe",
+    "ça va",
+    "ca va",
+    "ça va ?",
+    "ca va ?",
+    "comment tu t'appelles",
+    "tu t'appelles comment",
+    "quel est ton nom",
+    "c'est quoi ton prénom",
+    "qui es-tu",
+    "tu es qui",
+    "tu es quoi",
+    "comment je m'appelle",
+    "comment je m'appelles",
+    "tu connais mon prénom",
+    "tu te souviens de mon prénom",
+    "c'est quoi mon prénom",
+    "et toi",
+    "et toi ?",
+    "toi ?",
+    "et toi alors",
+}
+
+
+def _normalize_text(value: str) -> str:
+    if not isinstance(value, str):
+        return ""
+    return " ".join(value.strip().lower().split())
+
+
 def _get_name(memory: dict) -> str:
+    """
+    Retourne uniquement un prénom explicitement enregistré.
+    Aucun fallback. Aucun nom par défaut. Aucune supposition.
+    """
     profile = memory.get("profile", {})
     name = profile.get("name", "")
-    if isinstance(name, str):
-        return name.strip()
-    return ""
+
+    if not isinstance(name, str):
+        return ""
+
+    clean_name = name.strip()
+    if not clean_name:
+        return ""
+
+    return clean_name
+
+
+def _clear_name(memory: dict) -> None:
+    profile = memory.get("profile", {})
+    profile["name"] = ""
+    memory["profile"] = profile
+    save_memory(memory)
 
 
 def _save_name(memory: dict, name: str) -> None:
+    clean_name = name.strip()
+    if not clean_name:
+        return
+
     profile = memory.get("profile", {})
-    profile["name"] = name.strip().capitalize()
+    profile["name"] = clean_name.capitalize()
     memory["profile"] = profile
     save_memory(memory)
 
@@ -44,7 +103,7 @@ def _reply_with_name(memory: dict) -> str:
     if name:
         return f"Tu t'appelles {name}. Je m'en souviens."
 
-    return "Je ne connais pas encore ton prénom. Tu peux me le dire si tu veux."
+    return "Je ne te connais pas encore. Donne-moi ton prénom si tu veux."
 
 
 def _reply_memory(memory: dict) -> str:
@@ -64,7 +123,7 @@ def _reply_memory(memory: dict) -> str:
         parts.append(f"Le dernier sujet important que j'ai retenu, c'est {last_topic}.")
 
     if not parts:
-        return "Je garde une mémoire légère de nos échanges, mais elle est encore en train de se construire."
+        return "Je garde une mémoire légère de nos échanges, mais je ne connais pas encore ton prénom."
 
     return " ".join(parts)
 
@@ -117,9 +176,6 @@ def _save_exchange(
 
 
 def _build_conversation_history(memory: dict) -> list[dict[str, str]]:
-    """
-    Convertit l'historique local en format conversation pour le LLM.
-    """
     history = memory.get("history", [])
     conversation: list[dict[str, str]] = []
 
@@ -143,9 +199,6 @@ def _build_conversation_history(memory: dict) -> list[dict[str, str]]:
 
 
 def _call_llm_reply(user_input: str, memory: dict) -> dict | None:
-    """
-    Appelle le vrai moteur LLM pour une réponse libre.
-    """
     try:
         user_name = _get_name(memory)
         conversation = _build_conversation_history(memory)
@@ -173,17 +226,33 @@ def _call_llm_reply(user_input: str, memory: dict) -> dict | None:
         return None
 
 
+def _is_strict_chat_message(text: str) -> bool:
+    lower = _normalize_text(text)
+
+    if lower in STRICT_CHAT_MESSAGES:
+        return True
+
+    protected_prefixes = (
+        "je m'appelle pas ",
+        "je ne m'appelle pas ",
+        "mon prénom c'est ",
+        "je m'appelle ",
+        "comment tu t'appelles",
+        "comment je m'appelle",
+        "qui es-tu",
+        "tu es qui",
+        "merci",
+        "salut",
+        "bonjour",
+    )
+
+    return any(lower.startswith(prefix) for prefix in protected_prefixes)
+
+
 def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
-    """
-    Comprend les petites réponses dans un contexte déjà ouvert.
-    Exemple : 'je sais pas' après une devinette.
-    """
     lower = text.lower().strip()
     ensure_context(memory)
 
-    # =========================
-    # MODE DEVINETTE
-    # =========================
     if is_riddle_mode(memory):
         answer = get_riddle_answer(memory) or "un piano"
 
@@ -248,9 +317,6 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
                 "reply": reply,
             }
 
-    # =========================
-    # RÉPONSE À UNE QUESTION ÉMOTIONNELLE
-    # =========================
     qtype = get_last_question_type(memory)
 
     if qtype in {"emotional_followup", "general_followup"}:
@@ -285,7 +351,6 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
     lower = text.lower().strip()
     ensure_context(memory)
 
-    # Nom de Zoe
     if lower in {
         "comment tu t'appelles",
         "tu t'appelles comment",
@@ -305,7 +370,6 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    # Questions naturelles de conversation
     if lower in {"et toi", "et toi ?", "toi ?", "et toi alors"}:
         reply = "Moi ça va bien. Merci de me le demander."
         _save_exchange(memory, text, reply, "positive", "conversation", "precise", "reflect")
@@ -353,7 +417,6 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    # Salutations
     if lower in {"salut", "salut zoe", "bonjour", "hello", "coucou"}:
         reply = _greeting_reply(memory)
 
@@ -371,7 +434,6 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    # Question sur le prénom utilisateur
     if lower in {
         "comment je m'appelle",
         "comment je m'appelles",
@@ -389,7 +451,6 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    # Question mémoire globale
     if "tu te souviens de moi" in lower or "tu te souviens de nos échanges" in lower:
         reply = _reply_memory(memory)
         _save_exchange(memory, text, reply, "unknown", "memory", "precise", "reflect")
@@ -401,7 +462,30 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    # Prénom utilisateur
+    if lower.startswith("je m'appelle pas ") or lower.startswith("je ne m'appelle pas "):
+        _clear_name(memory)
+        reply = "D'accord. Je retire ce prénom de ma mémoire. Donne-moi le bon si tu veux."
+        _save_exchange(memory, text, reply, "unknown", "identity", "precise", "reflect")
+        return {
+            "emotion": "unknown",
+            "precision": "precise",
+            "topic": "identity",
+            "intent": "reflect",
+            "reply": reply,
+        }
+
+    if "ce n'est pas mon prénom" in lower or "c'est pas mon prénom" in lower or "tu te trompes de prénom" in lower:
+        _clear_name(memory)
+        reply = "D'accord. Je retire ce prénom de ma mémoire. Donne-moi le bon si tu veux."
+        _save_exchange(memory, text, reply, "unknown", "identity", "precise", "reflect")
+        return {
+            "emotion": "unknown",
+            "precision": "precise",
+            "topic": "identity",
+            "intent": "reflect",
+            "reply": reply,
+        }
+
     if lower.startswith("je m'appelle "):
         try:
             name = text.split("je m'appelle", 1)[1].strip().split(" ")[0]
@@ -436,7 +520,6 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
         except Exception:
             pass
 
-    # Petite conversation
     if lower in {"cava", "ça va", "ca va", "ça va ?", "ca va ?"}:
         name = _get_name(memory)
         if name:
@@ -454,7 +537,6 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    # Tests version
     if lower == "brain thinker":
         reply = "Mon cerveau avec réflexion est bien actif."
         _save_exchange(memory, text, reply, "positive", "system", "precise", "encourage")
@@ -484,17 +566,14 @@ def process_user_message(user_input: str, memory: dict) -> dict:
     text = user_input.strip()
     ensure_context(memory)
 
-    # 0. Contexte vivant
     contextual_result = _handle_contextual_reply(text, memory)
     if contextual_result is not None:
         return contextual_result
 
-    # 1. Règles directes
     direct_result = _direct_rules(text, memory)
     if direct_result is not None:
         return direct_result
 
-    # 2. Outil image
     if should_use_image_tool(text):
         conversation = _build_conversation_history(memory)
         image_result = generate_image_reply(
@@ -528,40 +607,6 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    # 3. Outil code
-    if should_use_code_tool(text):
-        conversation = _build_conversation_history(memory)
-        code_result = build_code_result(
-            user_message=text,
-            conversation=conversation,
-        )
-
-        reply = code_result["reply"]
-
-        result = {
-            "emotion": code_result.get("emotion", "positive"),
-            "precision": code_result.get("precision", "precise"),
-            "topic": code_result.get("topic", "code"),
-            "intent": code_result.get("intent", "reflect"),
-            "reply": reply,
-            "thought_summary": "mode code activé",
-            "strategy": "code_generation",
-            "tone": "technical",
-        }
-
-        _save_exchange(
-            memory=memory,
-            user_text=text,
-            reply=reply,
-            emotion=result["emotion"],
-            topic=result["topic"],
-            precision=result["precision"],
-            intent=result["intent"],
-        )
-
-        return result
-
-    # 4. Outil web
     if should_use_web(text):
         user_name = _get_name(memory)
         conversation = _build_conversation_history(memory)
@@ -596,12 +641,42 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    # 5. Analyse locale
+    if not _is_strict_chat_message(text) and should_use_code_tool(text):
+        conversation = _build_conversation_history(memory)
+        code_result = build_code_result(
+            user_message=text,
+            conversation=conversation,
+        )
+
+        reply = code_result["reply"]
+
+        result = {
+            "emotion": code_result.get("emotion", "positive"),
+            "precision": code_result.get("precision", "precise"),
+            "topic": code_result.get("topic", "code"),
+            "intent": code_result.get("intent", "reflect"),
+            "reply": reply,
+            "thought_summary": "mode code activé",
+            "strategy": "code_generation",
+            "tone": "technical",
+        }
+
+        _save_exchange(
+            memory=memory,
+            user_text=text,
+            reply=reply,
+            emotion=result["emotion"],
+            topic=result["topic"],
+            precision=result["precision"],
+            intent=result["intent"],
+        )
+
+        return result
+
     analysis = analyze_text(text, memory)
     thought_summary = think_about_message(text, memory, analysis)
     reply = build_final_response(text, memory, analysis, thought_summary)
 
-    # 6. Fallback LLM si la réponse locale semble trop faible
     llm_result = _call_llm_reply(text, memory)
     if llm_result is not None:
         reply = llm_result["reply"]
