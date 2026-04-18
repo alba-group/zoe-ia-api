@@ -1,3 +1,6 @@
+import re
+import unicodedata
+
 from core.analyzer import analyze_text
 from core.thinker import think_about_message
 from core.responder import build_final_response
@@ -152,6 +155,20 @@ def _normalize_user_text(text: str) -> str:
     return cleaned.strip()
 
 
+def _normalize_for_name(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
+
+    cleaned = text.strip().lower()
+    cleaned = cleaned.replace("’", "'")
+    cleaned = cleaned.replace("`", "'")
+    cleaned = cleaned.replace("´", "'")
+    cleaned = unicodedata.normalize("NFD", cleaned)
+    cleaned = "".join(ch for ch in cleaned if unicodedata.category(ch) != "Mn")
+    cleaned = _collapse_spaces(cleaned)
+    return cleaned
+
+
 def _safe_split_name(raw_value: str) -> str:
     if not isinstance(raw_value, str):
         return ""
@@ -163,6 +180,27 @@ def _safe_split_name(raw_value: str) -> str:
     candidate = candidate.split(" ")[0].strip()
     candidate = candidate.strip(" .,!?:;\"'`()[]{}")
     return candidate
+
+
+def _extract_name_from_message(text: str) -> str:
+    normalized = _normalize_for_name(text)
+
+    patterns = [
+        r"^je m'appelle\s+([a-zA-ZÀ-ÿ\-]+)$",
+        r"^je m appelle\s+([a-zA-ZÀ-ÿ\-]+)$",
+        r"^mon prenom c'est\s+([a-zA-ZÀ-ÿ\-]+)$",
+        r"^mon prenom c est\s+([a-zA-ZÀ-ÿ\-]+)$",
+        r"^mon prenom est\s+([a-zA-ZÀ-ÿ\-]+)$",
+        r"^moi c'est\s+([a-zA-ZÀ-ÿ\-]+)$",
+        r"^moi c est\s+([a-zA-ZÀ-ÿ\-]+)$",
+    ]
+
+    for pattern in patterns:
+        match = re.match(pattern, normalized, re.IGNORECASE)
+        if match:
+            return _safe_split_name(match.group(1))
+
+    return ""
 
 
 def _contains_any_phrase(text: str, phrases: set[str]) -> bool:
@@ -187,15 +225,20 @@ def _looks_like_user_name_question(text: str) -> bool:
     if text in USER_NAME_PATTERNS:
         return True
 
-    tokens = set(text.split())
-    if "prenom" in tokens or "prénom" in tokens:
-        if "mon" in tokens or "je" in tokens:
-            return True
+    question_markers = {
+        "comment",
+        "quel",
+        "quoi",
+        "connais",
+        "souviens",
+    }
 
-    if "m" in tokens and "appelle" in tokens:
+    tokens = set(text.split())
+
+    if ("prenom" in tokens or "prénom" in tokens) and question_markers & tokens:
         return True
 
-    if "je" in tokens and "appelle" in tokens:
+    if "appelle" in tokens and ("comment" in tokens or "quel" in tokens):
         return True
 
     return False
@@ -457,6 +500,29 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
 
     qtype = get_last_question_type(memory)
 
+    if qtype == "ask_name":
+        extracted_name = _extract_name_from_message(text)
+
+        if not extracted_name:
+            simple_candidate = _safe_split_name(text)
+            normalized_candidate = _normalize_user_text(simple_candidate)
+
+            if simple_candidate and len(simple_candidate.split()) == 1 and normalized_candidate.isalpha():
+                extracted_name = simple_candidate
+
+        if extracted_name:
+            _save_name(memory, extracted_name)
+            clear_waiting_flag(memory)
+            reply = f"Enchantée, {extracted_name.capitalize()}. Je retiens ton prénom."
+            _save_exchange(memory, text, reply, "positive", "identity", "precise", "encourage")
+            return {
+                "emotion": "positive",
+                "precision": "precise",
+                "topic": "identity",
+                "intent": "encourage",
+                "reply": reply,
+            }
+
     if qtype in {"emotional_followup", "general_followup"}:
         if lower in {"oui", "oui un peu", "un peu", "ca va un peu mieux", "ça va un peu mieux", "mieux"}:
             clear_waiting_flag(memory)
@@ -554,8 +620,26 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
+    extracted_name = _extract_name_from_message(text)
+    if extracted_name:
+        _save_name(memory, extracted_name)
+        clear_waiting_flag(memory)
+        reply = f"Enchantée, {extracted_name.capitalize()}. Je retiens ton prénom."
+        _save_exchange(memory, text, reply, "positive", "identity", "precise", "encourage")
+        return {
+            "emotion": "positive",
+            "precision": "precise",
+            "topic": "identity",
+            "intent": "encourage",
+            "reply": reply,
+        }
+
     if _looks_like_user_name_question(lower):
         reply = _reply_with_name(memory)
+
+        if reply == build_unknown_name_reply():
+            set_last_bot_question(memory, reply, "ask_name")
+
         _save_exchange(memory, text, reply, "unknown", "identity", "precise", "reflect")
         return {
             "emotion": "unknown",
@@ -575,46 +659,6 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "intent": "reflect",
             "reply": reply,
         }
-
-    if lower.startswith("je m appelle "):
-        try:
-            name = text.split("appelle", 1)[1].strip()
-            name = _safe_split_name(name)
-            if name:
-                _save_name(memory, name)
-                reply = f"Enchantée {name.capitalize()}. Je retiens ton prénom."
-                _save_exchange(memory, text, reply, "positive", "identity", "precise", "encourage")
-                return {
-                    "emotion": "positive",
-                    "precision": "precise",
-                    "topic": "identity",
-                    "intent": "encourage",
-                    "reply": reply,
-                }
-        except Exception:
-            pass
-
-    if lower.startswith("mon prenom c est") or lower.startswith("mon prénom c est"):
-        try:
-            if "mon prenom c est" in lower:
-                name = lower.replace("mon prenom c est", "", 1).strip()
-            else:
-                name = lower.replace("mon prénom c est", "", 1).strip()
-
-            name = _safe_split_name(name)
-            if name:
-                _save_name(memory, name)
-                reply = f"Merci {name.capitalize()}. Je retiens ton prénom."
-                _save_exchange(memory, text, reply, "positive", "identity", "precise", "encourage")
-                return {
-                    "emotion": "positive",
-                    "precision": "precise",
-                    "topic": "identity",
-                    "intent": "encourage",
-                    "reply": reply,
-                }
-        except Exception:
-            pass
 
     if lower in HOW_ARE_YOU_PATTERNS:
         name = _get_name(memory)
@@ -738,7 +782,6 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    # Important : le code vient après les messages simples protégés
     if not _is_protected_chat_message(normalized_text) and should_use_code_tool(normalized_text):
         conversation = _build_conversation_history(memory)
         code_result = build_code_result(
