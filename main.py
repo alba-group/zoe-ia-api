@@ -1,14 +1,8 @@
-from core.memory import (
-    load_memory,
-    save_memory,
-    add_message_to_history,
-    update_profile_from_analysis,
-)
+from core.memory import load_memory, save_memory
 from core.brain import process_user_message
 from core.utils import (
     ensure_project_files,
     log_event,
-    current_datetime_string,
 )
 
 
@@ -83,6 +77,14 @@ def clear_conversation(memory: dict) -> dict:
     memory["history"] = []
     memory["last_emotion"] = "unknown"
     memory["last_topic"] = "general"
+    memory["context"] = {
+        "mode": None,
+        "last_question_type": None,
+        "awaiting_user_reply": False,
+        "riddle_answer": None,
+        "riddle_question": None,
+        "last_bot_question": None,
+    }
     save_memory(memory)
     log_event("Historique vidé par l'utilisateur.")
     print("\nHistorique vidé. Zoe repart sur une base propre.")
@@ -102,20 +104,6 @@ def handle_user_input(user_input: str, memory: dict) -> dict:
     intent = result.get("intent", "clarify")
 
     print(f"\nZoe : {zoe_reply}")
-
-    add_message_to_history(
-        memory=memory,
-        user_message=user_input,
-        zoe_reply=zoe_reply,
-        emotion=emotion,
-        topic=topic,
-        precision=precision,
-        intent=intent,
-        timestamp=current_datetime_string(),
-    )
-
-    update_profile_from_analysis(memory=memory, analysis=result)
-    save_memory(memory)
 
     log_event(
         f"Message traité | emotion={emotion} | topic={topic} | "

@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Any
+import traceback
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
@@ -10,7 +11,7 @@ from core.context import ensure_context
 
 
 APP_TITLE = "Zoe IA API"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 
 
 app = FastAPI(
@@ -120,9 +121,16 @@ def chat(payload: ChatRequest) -> ChatResponse:
         )
 
     except Exception as e:
+        print("\n========== ERREUR /chat ==========")
+        print(f"Message reçu : {user_message!r}")
+        print(f"Type erreur : {type(e).__name__}")
+        print(f"Détail : {e}")
+        traceback.print_exc()
+        print("==================================\n")
+
         raise HTTPException(
             status_code=500,
-            detail=f"Erreur serveur Zoe : {str(e)}"
+            detail=f"Erreur serveur Zoe : {type(e).__name__}: {str(e)}"
         )
 
 
@@ -145,9 +153,15 @@ def get_memory() -> MemoryResponse:
         )
 
     except Exception as e:
+        print("\n========== ERREUR /memory ==========")
+        print(f"Type erreur : {type(e).__name__}")
+        print(f"Détail : {e}")
+        traceback.print_exc()
+        print("====================================\n")
+
         raise HTTPException(
             status_code=500,
-            detail=f"Impossible de lire la mémoire : {str(e)}"
+            detail=f"Impossible de lire la mémoire : {type(e).__name__}: {str(e)}"
         )
 
 
@@ -180,7 +194,13 @@ def clear_history() -> GenericResponse:
         )
 
     except Exception as e:
+        print("\n========== ERREUR /clear ==========")
+        print(f"Type erreur : {type(e).__name__}")
+        print(f"Détail : {e}")
+        traceback.print_exc()
+        print("===================================\n")
+
         raise HTTPException(
             status_code=500,
-            detail=f"Impossible de vider l'historique : {str(e)}"
+            detail=f"Impossible de vider l'historique : {type(e).__name__}: {str(e)}"
         ) 
