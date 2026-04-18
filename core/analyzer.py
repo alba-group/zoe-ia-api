@@ -161,10 +161,14 @@ def suggest_intent(emotion: str, precision: str) -> str:
     return "clarify"
 
 
-def analyze_text(text: str) -> dict[str, Any]:
+def analyze_text(text: str, memory: dict[str, Any] | None = None) -> dict[str, Any]:
     """
     Analyse locale complète d'un message.
+    Le paramètre memory est accepté pour compatibilité avec brain.py,
+    même s'il n'est pas encore utilisé ici.
     """
+    memory = memory or {}
+
     cleaned_text = normalize_text(text)
     emotion = detect_emotion(cleaned_text)
     precision = detect_precision(cleaned_text)
