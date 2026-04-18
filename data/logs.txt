@@ -1,0 +1,140 @@
+[INIT] Zoe logs initialized.[2026-04-17 20:27:28] Démarrage de Zoe.
+[2026-04-17 20:27:55] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:28:06] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:28:20] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:28:30] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:30:01] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:30:13] Message traité | emotion=negative | topic=general | precision=precise | intent=reflect
+[2026-04-17 20:30:35] Message traité | emotion=unknown | topic=general | precision=precise | intent=clarify
+[2026-04-17 20:30:56] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:31:02] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:31:12] Message traité | emotion=unknown | topic=general | precision=precise | intent=clarify
+[2026-04-17 20:46:21] Message traité | emotion=unknown | topic=general | precision=precise | intent=clarify
+[2026-04-17 20:46:40] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:46:58] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:48:49] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:52:00] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 20:52:26] Fermeture normale de Zoe.
+[2026-04-17 21:07:53] Démarrage de Zoe.
+[2026-04-17 21:08:01] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 21:08:14] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-17 21:08:25] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-17 21:08:36] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 21:08:41] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 21:12:23] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 21:12:43] Fermeture normale de Zoe.
+[2026-04-17 21:12:53] Démarrage de Zoe.
+[2026-04-17 21:12:59] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 21:13:03] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-17 21:13:12] Message traité | emotion=unknown | topic=identity | precision=precise | intent=reflect
+[2026-04-17 21:13:22] Message traité | emotion=unknown | topic=memory | precision=precise | intent=reflect
+[2026-04-17 21:13:36] Message traité | emotion=negative | topic=quotidien | precision=precise | intent=reflect
+[2026-04-17 21:13:43] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 21:18:51] Fermeture normale de Zoe.
+[2026-04-17 21:18:56] Démarrage de Zoe.
+[2026-04-17 21:19:02] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 21:19:16] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-17 21:19:29] Message traité | emotion=negative | topic=santé | precision=vague | intent=support
+[2026-04-17 21:19:38] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 21:19:56] Message traité | emotion=positive | topic=joie | precision=vague | intent=encourage
+[2026-04-17 21:20:12] Message traité | emotion=unknown | topic=memory | precision=precise | intent=reflect
+[2026-04-17 21:20:44] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 21:26:19] Fermeture normale de Zoe.
+[2026-04-17 21:26:32] Démarrage de Zoe.
+[2026-04-17 21:26:36] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 21:26:46] Message traité | emotion=unknown | topic=general | precision=precise | intent=clarify
+[2026-04-17 21:27:06] Message traité | emotion=unknown | topic=general | precision=precise | intent=clarify
+[2026-04-17 21:34:49] Fermeture normale de Zoe.
+[2026-04-17 21:35:42] Démarrage de Zoe.
+[2026-04-17 21:35:53] Message traité | emotion=positive | topic=system | precision=precise | intent=encourage
+[2026-04-17 21:36:06] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 21:36:20] Message traité | emotion=unknown | topic=web | precision=precise | intent=clarify
+[2026-04-17 21:36:41] Message traité | emotion=unknown | topic=web | precision=precise | intent=clarify
+[2026-04-17 21:37:10] Message traité | emotion=unknown | topic=web | precision=precise | intent=clarify
+[2026-04-17 21:38:42] Fermeture normale de Zoe.
+[2026-04-17 21:42:22] Démarrage de Zoe.
+[2026-04-17 21:42:34] Message traité | emotion=unknown | topic=web | precision=precise | intent=clarify
+[2026-04-17 21:43:58] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 21:48:01] Fermeture normale de Zoe.
+[2026-04-17 21:48:07] Démarrage de Zoe.
+[2026-04-17 21:48:10] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 21:48:23] Message traité | emotion=positive | topic=identity | precision=precise | intent=reflect
+[2026-04-17 22:01:05] Fermeture normale de Zoe.
+[2026-04-17 22:01:12] Démarrage de Zoe.
+[2026-04-17 22:01:15] Message traité | emotion=positive | topic=system | precision=precise | intent=encourage
+[2026-04-17 22:01:25] Message traité | emotion=negative | topic=general | precision=vague | intent=support
+[2026-04-17 22:01:36] Message traité | emotion=positive | topic=joie | precision=vague | intent=encourage
+[2026-04-17 22:01:50] Message traité | emotion=negative | topic=santé | precision=vague | intent=support
+[2026-04-17 22:02:06] Message traité | emotion=positive | topic=identity | precision=precise | intent=reflect
+[2026-04-17 22:02:18] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-17 22:02:41] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-17 22:02:51] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-17 22:03:14] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:05:52] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 22:05:57] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:06:16] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-17 22:06:26] Message traité | emotion=unknown | topic=identity | precision=precise | intent=reflect
+[2026-04-17 22:06:32] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:06:47] Message traité | emotion=unknown | topic=general | precision=precise | intent=clarify
+[2026-04-17 22:08:06] Fermeture normale de Zoe.
+[2026-04-17 22:08:52] Démarrage de Zoe.
+[2026-04-17 22:10:08] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 22:10:15] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 22:18:12] Fermeture normale de Zoe.
+[2026-04-17 22:19:00] Démarrage de Zoe.
+[2026-04-17 22:19:09] Message traité | emotion=positive | topic=identity | precision=precise | intent=reflect
+[2026-04-17 22:19:19] Message traité | emotion=unknown | topic=identity | precision=precise | intent=reflect
+[2026-04-17 22:19:29] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-17 22:19:38] Message traité | emotion=unknown | topic=identity | precision=precise | intent=reflect
+[2026-04-17 22:19:47] Message traité | emotion=positive | topic=conversation | precision=precise | intent=reflect
+[2026-04-17 22:19:59] Message traité | emotion=positive | topic=identity | precision=precise | intent=reflect
+[2026-04-17 22:20:08] Message traité | emotion=positive | topic=fun | precision=precise | intent=encourage
+[2026-04-17 22:20:38] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:20:42] Message traité | emotion=positive | topic=conversation | precision=vague | intent=ask_open_question
+[2026-04-17 22:21:39] Message traité | emotion=positive | topic=fun | precision=precise | intent=encourage
+[2026-04-17 22:21:49] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:23:30] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:27:27] Fermeture normale de Zoe.
+[2026-04-17 22:27:36] Démarrage de Zoe.
+[2026-04-17 22:27:39] Message traité | emotion=positive | topic=fun | precision=precise | intent=encourage
+[2026-04-17 22:27:48] Message traité | emotion=unknown | topic=fun | precision=precise | intent=reflect
+[2026-04-17 22:27:54] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:28:04] Message traité | emotion=positive | topic=fun | precision=precise | intent=encourage
+[2026-04-17 22:28:13] Message traité | emotion=unknown | topic=fun | precision=precise | intent=reflect
+[2026-04-17 22:28:24] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:28:32] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:28:40] Message traité | emotion=positive | topic=conversation | precision=vague | intent=ask_open_question
+[2026-04-17 22:28:51] Message traité | emotion=positive | topic=general | precision=precise | intent=encourage
+[2026-04-17 22:38:57] Fermeture normale de Zoe.
+[2026-04-17 22:39:03] Démarrage de Zoe.
+[2026-04-17 22:39:06] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 22:39:09] Message traité | emotion=positive | topic=conversation | precision=vague | intent=ask_open_question
+[2026-04-17 22:39:14] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:39:31] Message traité | emotion=positive | topic=fun | precision=precise | intent=encourage
+[2026-04-17 22:39:44] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:50:17] Fermeture normale de Zoe.
+[2026-04-17 22:50:25] Démarrage de Zoe.
+[2026-04-17 22:50:31] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-17 22:50:45] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:50:58] Message traité | emotion=unknown | topic=general | precision=vague | intent=clarify
+[2026-04-17 22:56:13] Fermeture normale de Zoe.
+[2026-04-17 22:59:38] Démarrage de Zoe.
+[2026-04-17 22:59:43] Message traité | emotion=positive | topic=identity | precision=precise | intent=reflect
+[2026-04-17 22:59:55] Message traité | emotion=unknown | topic=code | precision=precise | intent=clarify
+[2026-04-17 23:00:11] Message traité | emotion=unknown | topic=web | precision=precise | intent=clarify
+[2026-04-17 23:00:21] Message traité | emotion=negative | topic=quotidien | precision=precise | intent=reflect
+[2026-04-17 23:06:33] Fermeture normale de Zoe.
+[2026-04-17 23:06:41] Démarrage de Zoe.
+[2026-04-17 23:06:53] Message traité | emotion=positive | topic=identity | precision=precise | intent=reflect
+[2026-04-17 23:07:04] Message traité | emotion=unknown | topic=code | precision=precise | intent=clarify
+[2026-04-17 23:07:19] Fermeture normale de Zoe.
+[2026-04-17 23:10:14] Démarrage de Zoe.
+[2026-04-17 23:10:26] Message traité | emotion=unknown | topic=web | precision=precise | intent=clarify
+[2026-04-17 23:10:45] Message traité | emotion=unknown | topic=code | precision=precise | intent=clarify
+[2026-04-17 23:10:57] Message traité | emotion=positive | topic=identity | precision=precise | intent=reflect
+[2026-04-17 23:19:15] Fermeture normale de Zoe.
+[2026-04-17 23:19:37] Démarrage de Zoe.
+[2026-04-17 23:20:17] Message traité | emotion=unknown | topic=web | precision=precise | intent=clarify
+[2026-04-17 23:20:48] Message traité | emotion=unknown | topic=web | precision=precise | intent=clarify
+[2026-04-17 23:21:13] Message traité | emotion=unknown | topic=code | precision=precise | intent=clarify
+[2026-04-17 23:48:43] Fermeture normale de Zoe.
