@@ -1,14 +1,68 @@
 {
-  "history": [],
-  "profile": {},
-  "last_emotion": "unknown",
-  "last_topic": "general",
-  "context": {
-    "mode": null,
-    "last_question_type": null,
-    "awaiting_user_reply": false,
-    "riddle_answer": null,
-    "riddle_question": null,
-    "last_bot_question": null
-  }
+  "history": [
+    {
+      "timestamp": "2026-04-18 18:36:02",
+      "user_message": "salut",
+      "zoe_reply": "Salut. Je suis contente de te revoir.",
+      "emotion": "positive",
+      "topic": "general",
+      "precision": "vague",
+      "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-18 18:36:02",
+      "user_message": "salut",
+      "zoe_reply": "Salut. Je suis contente de te revoir.",
+      "emotion": "positive",
+      "topic": "general",
+      "precision": "vague",
+      "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-18 18:36:08",
+      "user_message": "ca va",
+      "zoe_reply": "Oui, ça va bien. Merci. Et toi, comment tu te sens aujourd'hui ?",
+      "emotion": "positive",
+      "topic": "conversation",
+      "precision": "vague",
+      "intent": "ask_open_question"
+    },
+    {
+      "timestamp": "2026-04-18 18:36:08",
+      "user_message": "ca va",
+      "zoe_reply": "Oui, ça va bien. Merci. Et toi, comment tu te sens aujourd'hui ?",
+      "emotion": "positive",
+      "topic": "conversation",
+      "precision": "vague",
+      "intent": "ask_open_question"
+    },
+    {
+      "timestamp": "2026-04-18 18:36:19",
+      "user_message": "oui",
+      "zoe_reply": "Je suis contente de lire ça. Qu'est-ce qui t'aide le plus en ce moment ?",
+      "emotion": "positive",
+      "topic": "general",
+      "precision": "precise",
+      "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-18 18:36:19",
+      "user_message": "oui",
+      "zoe_reply": "Je suis contente de lire ça. Qu'est-ce qui t'aide le plus en ce moment ?",
+      "emotion": "positive",
+      "topic": "general",
+      "precision": "precise",
+      "intent": "encourage"
+    }
+  ],
+  "profile": {
+    "name": "",
+    "emotion_counter": {
+      "positive": 6
+    },
+    "last_detected_emotion": "positive",
+    "favorite_topic": "general"
+  },
+  "last_emotion": "positive",
+  "last_topic": "general"
 }

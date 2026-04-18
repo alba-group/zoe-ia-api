@@ -138,3 +138,11 @@
 [2026-04-17 23:20:48] Message traité | emotion=unknown | topic=web | precision=precise | intent=clarify
 [2026-04-17 23:21:13] Message traité | emotion=unknown | topic=code | precision=precise | intent=clarify
 [2026-04-17 23:48:43] Fermeture normale de Zoe.
+[2026-04-18 18:35:57] Démarrage de Zoe.
+[2026-04-18 18:36:02] Message traité | emotion=positive | topic=general | precision=vague | intent=encourage
+[2026-04-18 18:36:08] Message traité | emotion=positive | topic=conversation | precision=vague | intent=ask_open_question
+[2026-04-18 18:36:13] Erreur pendant le traitement : analyze_text() takes 1 positional argument but 2 were given
+[2026-04-18 18:36:19] Message traité | emotion=positive | topic=general | precision=precise | intent=encourage
+[2026-04-18 18:36:47] Erreur pendant le traitement : analyze_text() takes 1 positional argument but 2 were given
+[2026-04-18 18:37:00] Fermeture normale de Zoe.
+[2026-04-18 18:37:16] Démarrage de Zoe.
