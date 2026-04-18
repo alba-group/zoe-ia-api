@@ -55,6 +55,9 @@ ASSISTANT_IDENTITY_PATTERNS = {
     "c est quoi ton prénom",
     "tu t appelles comment",
     "comment tu t appelles",
+    "et toi comment tu t appelles",
+    "et toi tu t appelles comment",
+    "toi comment tu t appelles",
 }
 
 USER_NAME_PATTERNS = {
@@ -66,6 +69,8 @@ USER_NAME_PATTERNS = {
     "tu te souviens de mon prénom",
     "c est quoi mon prenom",
     "c est quoi mon prénom",
+    "quel est mon prenom",
+    "quel est mon prénom",
 }
 
 NEGATIVE_NAME_PATTERNS = {
@@ -116,11 +121,17 @@ PROTECTED_CHAT_PREFIXES = (
     "coucou",
     "merci",
     "comment je m appelle",
+    "quel est mon prenom",
+    "quel est mon prénom",
     "je m appelle ",
     "je m appelle pas",
     "je ne m appelle pas",
     "mon prenom c est",
     "mon prénom c est",
+    "mon prenom est",
+    "mon prénom est",
+    "moi c est",
+    "moi c'est",
 )
 
 
@@ -203,6 +214,35 @@ def _extract_name_from_message(text: str) -> str:
     return ""
 
 
+def _is_invalid_name_candidate(name: str) -> bool:
+    forbidden = {
+        "quel",
+        "quelle",
+        "quels",
+        "quelles",
+        "et",
+        "toi",
+        "comment",
+        "mon",
+        "prenom",
+        "prénom",
+        "nom",
+        "bonjour",
+        "bonsoir",
+        "salut",
+        "merci",
+        "temps",
+        "meteo",
+        "météo",
+        "donne",
+        "pourquoi",
+        "ou",
+        "où",
+        "quand",
+    }
+    return _normalize_user_text(name) in forbidden
+
+
 def _contains_any_phrase(text: str, phrases: set[str]) -> bool:
     return any(phrase in text for phrase in phrases)
 
@@ -212,6 +252,7 @@ def _looks_like_assistant_identity_question(text: str) -> bool:
         return True
 
     tokens = set(text.split())
+
     if "qui" in tokens and "tu" in tokens:
         return True
 
@@ -504,11 +545,21 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
         extracted_name = _extract_name_from_message(text)
 
         if not extracted_name:
-            simple_candidate = _safe_split_name(text)
-            normalized_candidate = _normalize_user_text(simple_candidate)
+            raw_candidate = text.strip()
+            normalized_candidate = _normalize_user_text(raw_candidate)
 
-            if simple_candidate and len(simple_candidate.split()) == 1 and normalized_candidate.isalpha():
-                extracted_name = simple_candidate
+            words = normalized_candidate.split()
+
+            if (
+                raw_candidate
+                and len(words) == 1
+                and words[0].isalpha()
+                and len(words[0]) >= 2
+            ):
+                extracted_name = _safe_split_name(raw_candidate)
+
+        if extracted_name and _is_invalid_name_candidate(extracted_name):
+            extracted_name = ""
 
         if extracted_name:
             _save_name(memory, extracted_name)
@@ -522,6 +573,9 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
                 "intent": "encourage",
                 "reply": reply,
             }
+
+        # Si la réponse n'est pas un prénom, on coupe le mode ask_name
+        clear_waiting_flag(memory)
 
     if qtype in {"emotional_followup", "general_followup"}:
         if lower in {"oui", "oui un peu", "un peu", "ca va un peu mieux", "ça va un peu mieux", "mieux"}:
@@ -621,7 +675,7 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
         }
 
     extracted_name = _extract_name_from_message(text)
-    if extracted_name:
+    if extracted_name and not _is_invalid_name_candidate(extracted_name):
         _save_name(memory, extracted_name)
         clear_waiting_flag(memory)
         reply = f"Enchantée, {extracted_name.capitalize()}. Je retiens ton prénom."
@@ -707,15 +761,15 @@ def process_user_message(user_input: str, memory: dict) -> dict:
     normalized_text = _normalize_user_text(text)
     ensure_context(memory)
 
-    contextual_result = _handle_contextual_reply(text, memory)
-    if contextual_result is not None:
-        return contextual_result
-
+    # 1. Règles directes prioritaires
     direct_result = _direct_rules(text, memory)
     if direct_result is not None:
         return direct_result
 
+    # 2. Image prioritaire
     if should_use_image_tool(normalized_text):
+        clear_waiting_flag(memory)
+
         conversation = _build_conversation_history(memory)
         image_result = generate_image_reply(
             user_message=text,
@@ -748,7 +802,10 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
+    # 3. Web prioritaire
     if should_use_web(normalized_text):
+        clear_waiting_flag(memory)
+
         user_name = _get_name(memory)
         conversation = _build_conversation_history(memory)
         web_result = build_web_reply(
@@ -782,7 +839,10 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
+    # 4. Code prioritaire
     if not _is_protected_chat_message(normalized_text) and should_use_code_tool(normalized_text):
+        clear_waiting_flag(memory)
+
         conversation = _build_conversation_history(memory)
         code_result = build_code_result(
             user_message=text,
@@ -814,6 +874,12 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
+    # 5. Contexte vivant après les priorités
+    contextual_result = _handle_contextual_reply(text, memory)
+    if contextual_result is not None:
+        return contextual_result
+
+    # 6. Analyse générale
     analysis = analyze_text(text, memory)
     thought = think_about_message(text, memory, analysis)
 
