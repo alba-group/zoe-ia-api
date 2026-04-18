@@ -1,24 +1,25 @@
 from typing import Any
 
+from core.dictionary.greetings import build_greeting_reply
+from core.dictionary.emotions import build_emotion_reply
+from core.dictionary.tones import apply_tone
+from core.dictionary.sentences import (
+    build_identity_reply,
+    build_unknown_name_reply,
+    build_wrong_name_reply,
+    build_listening_reply,
+    build_memory_empty_reply,
+    build_riddle_stop_reply,
+    GENERAL_POSITIVE_REPLY,
+    GENERAL_SUPPORT_REPLY,
+    GENERAL_CLARIFY_REPLY,
+)
+
 
 def _safe_name(name: str) -> str:
     if isinstance(name, str):
         return name.strip()
     return ""
-
-
-def _prefix_with_name(text: str, user_name: str) -> str:
-    user_name = _safe_name(user_name)
-    if not user_name:
-        return text
-
-    if text.startswith("Je suis là"):
-        return text.replace("Je suis là", f"Je suis là, {user_name}", 1)
-
-    if text.startswith("Salut"):
-        return text.replace("Salut", f"Salut {user_name}", 1)
-
-    return text
 
 
 def _build_from_strategy(
@@ -38,7 +39,7 @@ def _build_from_strategy(
         return "Je suis là. Qu'est-ce qui te pèse le plus aujourd'hui ?"
 
     if strategy == "clarify_event":
-        return "Je vois. Tu veux m'expliquer un peu plus ce qui s'est passé ?"
+        return GENERAL_CLARIFY_REPLY
 
     if strategy == "find_source_of_stress":
         return "Tu sembles sous pression. Tu sais ce qui te met dans cet état ?"
@@ -61,7 +62,7 @@ def _build_from_strategy(
     if strategy == "highlight_improvement":
         if memory_hint:
             return f"{memory_hint} Qu'est-ce qui t'a fait du bien aujourd'hui ?"
-        return "Ça fait plaisir à entendre. Qu'est-ce qui t'a fait du bien aujourd'hui ?"
+        return f"{GENERAL_POSITIVE_REPLY} Qu'est-ce qui t'a fait du bien aujourd'hui ?"
 
     if strategy == "ask_positive_detail":
         return "C'est une bonne nouvelle. Qu'est-ce qui t'a rendu content aujourd'hui ?"
@@ -76,34 +77,9 @@ def _build_from_strategy(
         return "Tu peux prendre ton temps. Je t'écoute."
 
     if strategy == "generic_clarify":
-        if user_name:
-            return f"Je t'écoute, {user_name}. Tu peux m'en dire un peu plus ?"
-        return "Je t'écoute. Tu peux m'en dire un peu plus ?"
+        return build_listening_reply(user_name)
 
-    if user_name:
-        return f"Je t'écoute, {user_name}. Tu peux m'en dire un peu plus ?"
-
-    return "Je t'écoute. Tu peux m'en dire un peu plus ?"
-
-
-def _apply_tone(text: str, tone: str) -> str:
-    """
-    Ajuste légèrement le ton sans rendre la réponse artificielle.
-    """
-    if tone == "gentle" and not text.startswith("Je suis là"):
-        return f"Je suis là. {text}"
-
-    if tone == "warm" and not text.startswith("Ça fait plaisir"):
-        if "bonne nouvelle" in text.lower():
-            return text
-        return f"Ça fait plaisir à entendre. {text}"
-
-    if tone == "soft" and not text.startswith("Je vois"):
-        if "fatigué" in text.lower() or "fatigue" in text.lower():
-            return text
-        return f"Je vois. {text}"
-
-    return text
+    return build_listening_reply(user_name)
 
 
 def build_response_from_thought(
@@ -127,7 +103,7 @@ def build_response_from_thought(
         memory_hint=memory_hint
     )
 
-    reply = _apply_tone(reply, tone)
+    reply = apply_tone(reply, tone)
 
     return reply
 
@@ -142,35 +118,15 @@ def build_response_from_analysis(
     emotion = analysis.get("emotion", "unknown")
     precision = analysis.get("precision", "vague")
     user_name = ""
+
     if memory:
         user_name = memory.get("profile", {}).get("name", "")
 
-    if emotion in {"negative", "sadness"}:
-        if precision == "vague":
-            return _prefix_with_name("Je suis là. Qu'est-ce qui ne va pas aujourd'hui ?", user_name)
-        return "Je vois. Tu veux m'expliquer un peu plus ce qui s'est passé ?"
-
-    if emotion == "stress":
-        if precision == "vague":
-            return "Tu sembles stressé. Tu sais ce qui te met dans cet état ?"
-        return "Je comprends. Qu'est-ce qui te pèse le plus dans cette situation ?"
-
-    if emotion == "fatigue":
-        if precision == "vague":
-            return "Tu as l'air fatigué. Tu sais d'où ça vient aujourd'hui ?"
-        return "Je vois. Cette fatigue vient plutôt du corps, du moral ou de ta journée ?"
-
-    if emotion == "anger":
-        if precision == "vague":
-            return "Je sens de la colère dans ce que tu dis. Qu'est-ce qui t'a énervé ?"
-        return "Je comprends. Qu'est-ce qui t'a le plus blessé ou agacé dans cette situation ?"
-
-    if emotion in {"positive", "joy"}:
-        if precision == "vague":
-            return "C'est une bonne nouvelle. Qu'est-ce qui t'a rendu content aujourd'hui ?"
-        return "Ça fait plaisir à entendre. Quel moment t'a fait le plus de bien ?"
-
-    return _prefix_with_name("Je t'écoute. Tu peux m'en dire un peu plus ?", user_name)
+    return build_emotion_reply(
+        emotion=emotion,
+        precision=precision,
+        user_name=user_name,
+    )
 
 
 def build_greeting(memory: dict[str, Any] | None = None) -> str:
@@ -179,18 +135,11 @@ def build_greeting(memory: dict[str, Any] | None = None) -> str:
     last_emotion = memory.get("last_emotion", "unknown")
     last_topic = memory.get("last_topic", "general")
 
-    name = _safe_name(name)
-
-    if name and last_emotion in {"negative", "stress", "fatigue", "sadness"}:
-        return f"Salut {name}. Je suis contente de te revoir. Ça va un peu mieux aujourd'hui ?"
-
-    if name and last_topic not in {"general", "identity", "memory"}:
-        return f"Salut {name}. Je suis contente de te revoir. Tu veux qu'on reprenne là où on s'était arrêtés ?"
-
-    if name:
-        return f"Salut {name}. Je suis contente de te revoir."
-
-    return "Salut. Je suis contente de te revoir."
+    return build_greeting_reply(
+        user_name=name,
+        last_emotion=last_emotion,
+        last_topic=last_topic,
+    )
 
 
 def build_memory_reply(memory: dict[str, Any] | None = None) -> str:
@@ -212,7 +161,7 @@ def build_memory_reply(memory: dict[str, Any] | None = None) -> str:
         parts.append(f"Le dernier sujet important que j'ai retenu, c'est {last_topic}.")
 
     if not parts:
-        return "Je garde une trace légère de nos échanges, mais ma mémoire est encore en train de se construire."
+        return build_memory_empty_reply()
 
     return " ".join(parts)
 

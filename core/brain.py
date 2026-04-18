@@ -22,61 +22,219 @@ from core.code_tool import should_use_code_tool, build_code_result
 from core.image_tool import should_use_image_tool, generate_image_reply
 from core.llm_client import create_llm_client, build_zoe_system_prompt
 
+from core.dictionary import (
+    ALL_SYMBOLS,
+    SPACE_SYMBOLS,
+    ALL_EMOJIS,
+    is_greeting,
+    build_greeting_reply,
+    build_identity_reply,
+    build_unknown_name_reply,
+    build_wrong_name_reply,
+    build_memory_empty_reply,
+)
 
-STRICT_CHAT_MESSAGES = {
-    "salut",
-    "salut zoe",
-    "bonjour",
-    "bonsoir",
-    "hello",
-    "coucou",
-    "merci",
-    "merci zoe",
-    "ça va",
-    "ca va",
-    "ça va ?",
-    "ca va ?",
-    "comment tu t'appelles",
-    "tu t'appelles comment",
-    "quel est ton nom",
-    "c'est quoi ton prénom",
-    "qui es-tu",
+
+IDENTITY_HINTS = {
+    "nom",
+    "prenom",
+    "prénom",
+    "appelle",
+    "appelles",
+}
+
+ASSISTANT_IDENTITY_PATTERNS = {
+    "qui es tu",
     "tu es qui",
     "tu es quoi",
-    "comment je m'appelle",
-    "comment je m'appelles",
+    "quel est ton nom",
+    "c est quoi ton prenom",
+    "c est quoi ton prénom",
+    "tu t appelles comment",
+    "comment tu t appelles",
+}
+
+USER_NAME_PATTERNS = {
+    "comment je m appelle",
+    "comment je m appelles",
+    "tu connais mon prenom",
     "tu connais mon prénom",
+    "tu te souviens de mon prenom",
     "tu te souviens de mon prénom",
-    "c'est quoi mon prénom",
+    "c est quoi mon prenom",
+    "c est quoi mon prénom",
+}
+
+NEGATIVE_NAME_PATTERNS = {
+    "je m appelle pas",
+    "je ne m appelle pas",
+    "ce n est pas mon prenom",
+    "ce n est pas mon prénom",
+    "c est pas mon prenom",
+    "c est pas mon prénom",
+    "tu te trompes de prenom",
+    "tu te trompes de prénom",
+}
+
+RIDDLE_REQUEST_PATTERNS = {
+    "fais moi une devinette",
+    "donne moi une devinette",
+    "une devinette",
+}
+
+HOW_ARE_YOU_PATTERNS = {
+    "ca va",
+    "ça va",
+    "ca va ?",
+    "ça va ?",
+    "cava",
+}
+
+SIMPLE_CHAT_PATTERNS = {
+    "merci",
+    "merci zoe",
     "et toi",
     "et toi ?",
     "toi ?",
     "et toi alors",
+    "je suis triste",
+    "je t aime",
+    "j ai besoin de parler",
+    "j'ai besoin de parler",
 }
 
+PROTECTED_CHAT_PREFIXES = (
+    "comment tu t",
+    "tu t appelles",
+    "qui es tu",
+    "salut",
+    "bonjour",
+    "bonsoir",
+    "coucou",
+    "merci",
+    "comment je m appelle",
+    "je m appelle ",
+    "je m appelle pas",
+    "je ne m appelle pas",
+    "mon prenom c est",
+    "mon prénom c est",
+)
 
-def _normalize_text(value: str) -> str:
-    if not isinstance(value, str):
+
+def _collapse_spaces(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _normalize_user_text(text: str) -> str:
+    """
+    Normalise un texte utilisateur :
+    - minuscules
+    - suppression des emojis
+    - remplacement ponctuation/symboles par espaces
+    - compactage des espaces
+    """
+    if not isinstance(text, str):
         return ""
-    return " ".join(value.strip().lower().split())
+
+    cleaned = text
+
+    for space_symbol in SPACE_SYMBOLS:
+        cleaned = cleaned.replace(space_symbol, " ")
+
+    for emoji in ALL_EMOJIS:
+        cleaned = cleaned.replace(emoji, " ")
+
+    for symbol in ALL_SYMBOLS:
+        cleaned = cleaned.replace(symbol, " ")
+
+    cleaned = cleaned.lower()
+    cleaned = _collapse_spaces(cleaned)
+    return cleaned.strip()
+
+
+def _safe_split_name(raw_value: str) -> str:
+    if not isinstance(raw_value, str):
+        return ""
+
+    candidate = raw_value.strip()
+    if not candidate:
+        return ""
+
+    candidate = candidate.split(" ")[0].strip()
+    candidate = candidate.strip(" .,!?:;\"'`()[]{}")
+    return candidate
+
+
+def _contains_any_phrase(text: str, phrases: set[str]) -> bool:
+    return any(phrase in text for phrase in phrases)
+
+
+def _looks_like_assistant_identity_question(text: str) -> bool:
+    if text in ASSISTANT_IDENTITY_PATTERNS:
+        return True
+
+    tokens = set(text.split())
+    if "qui" in tokens and "tu" in tokens:
+        return True
+
+    if IDENTITY_HINTS & tokens and "tu" in tokens:
+        return True
+
+    return False
+
+
+def _looks_like_user_name_question(text: str) -> bool:
+    if text in USER_NAME_PATTERNS:
+        return True
+
+    tokens = set(text.split())
+    if "prenom" in tokens or "prénom" in tokens:
+        if "mon" in tokens or "je" in tokens:
+            return True
+
+    if "m" in tokens and "appelle" in tokens:
+        return True
+
+    if "je" in tokens and "appelle" in tokens:
+        return True
+
+    return False
+
+
+def _is_protected_chat_message(text: str) -> bool:
+    if not text:
+        return False
+
+    if is_greeting(text):
+        return True
+
+    if text in SIMPLE_CHAT_PATTERNS:
+        return True
+
+    if _looks_like_assistant_identity_question(text):
+        return True
+
+    if _looks_like_user_name_question(text):
+        return True
+
+    if _contains_any_phrase(text, NEGATIVE_NAME_PATTERNS):
+        return True
+
+    return any(text.startswith(prefix) for prefix in PROTECTED_CHAT_PREFIXES)
 
 
 def _get_name(memory: dict) -> str:
     """
-    Retourne uniquement un prénom explicitement enregistré.
-    Aucun fallback. Aucun nom par défaut. Aucune supposition.
+    Retourne uniquement un prénom explicitement mémorisé.
+    Aucun fallback automatique.
     """
     profile = memory.get("profile", {})
     name = profile.get("name", "")
 
-    if not isinstance(name, str):
-        return ""
+    if isinstance(name, str):
+        return name.strip()
 
-    clean_name = name.strip()
-    if not clean_name:
-        return ""
-
-    return clean_name
+    return ""
 
 
 def _clear_name(memory: dict) -> None:
@@ -87,7 +245,8 @@ def _clear_name(memory: dict) -> None:
 
 
 def _save_name(memory: dict, name: str) -> None:
-    clean_name = name.strip()
+    clean_name = _safe_split_name(name)
+
     if not clean_name:
         return
 
@@ -103,7 +262,7 @@ def _reply_with_name(memory: dict) -> str:
     if name:
         return f"Tu t'appelles {name}. Je m'en souviens."
 
-    return "Je ne te connais pas encore. Donne-moi ton prénom si tu veux."
+    return build_unknown_name_reply()
 
 
 def _reply_memory(memory: dict) -> str:
@@ -123,7 +282,7 @@ def _reply_memory(memory: dict) -> str:
         parts.append(f"Le dernier sujet important que j'ai retenu, c'est {last_topic}.")
 
     if not parts:
-        return "Je garde une mémoire légère de nos échanges, mais je ne connais pas encore ton prénom."
+        return build_memory_empty_reply()
 
     return " ".join(parts)
 
@@ -131,14 +290,13 @@ def _reply_memory(memory: dict) -> str:
 def _greeting_reply(memory: dict) -> str:
     name = _get_name(memory)
     last_emotion = memory.get("last_emotion", "unknown")
+    last_topic = memory.get("last_topic", "general")
 
-    if name and last_emotion in {"negative", "stress", "fatigue", "sadness"}:
-        return f"Salut {name}. Je suis contente de te revoir. Ça va un peu mieux aujourd'hui ?"
-
-    if name:
-        return f"Salut {name}. Je suis contente de te revoir."
-
-    return "Salut. Je suis contente de te revoir."
+    return build_greeting_reply(
+        user_name=name,
+        last_emotion=last_emotion,
+        last_topic=last_topic,
+    )
 
 
 def _save_exchange(
@@ -148,7 +306,7 @@ def _save_exchange(
     emotion: str,
     topic: str,
     precision: str,
-    intent: str
+    intent: str,
 ) -> None:
     add_message_to_history(
         memory=memory,
@@ -226,31 +384,8 @@ def _call_llm_reply(user_input: str, memory: dict) -> dict | None:
         return None
 
 
-def _is_strict_chat_message(text: str) -> bool:
-    lower = _normalize_text(text)
-
-    if lower in STRICT_CHAT_MESSAGES:
-        return True
-
-    protected_prefixes = (
-        "je m'appelle pas ",
-        "je ne m'appelle pas ",
-        "mon prénom c'est ",
-        "je m'appelle ",
-        "comment tu t'appelles",
-        "comment je m'appelle",
-        "qui es-tu",
-        "tu es qui",
-        "merci",
-        "salut",
-        "bonjour",
-    )
-
-    return any(lower.startswith(prefix) for prefix in protected_prefixes)
-
-
 def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
-    lower = text.lower().strip()
+    lower = _normalize_user_text(text)
     ensure_context(memory)
 
     if is_riddle_mode(memory):
@@ -258,15 +393,17 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
 
         if lower in {
             "je sais pas",
-            "j'sais pas",
+            "j sais pas",
             "je ne sais pas",
             "jsais pas",
+            "aucune idee",
             "aucune idée",
-            "j'abandonne",
+            "j abandonne",
             "abandon",
+            "donne la reponse",
             "donne la réponse",
-            "c'est quoi",
-            "dis-moi",
+            "c est quoi",
+            "dis moi",
         }:
             reply = f"La réponse était : {answer}. Tu en veux une autre ?"
             set_last_bot_question(memory, reply, "riddle_followup")
@@ -284,7 +421,7 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
             "oui",
             "oui encore",
             "une autre",
-            "vas-y",
+            "vas y",
         }:
             question = "Je commence sans voix, je finis sans air, et pourtant je peux être très chère. Qui suis-je ?"
             answer = "une bague"
@@ -303,6 +440,7 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
             "non",
             "non merci",
             "stop",
+            "arrete",
             "arrête",
             "pas une autre",
         }:
@@ -320,7 +458,7 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
     qtype = get_last_question_type(memory)
 
     if qtype in {"emotional_followup", "general_followup"}:
-        if lower in {"oui", "oui un peu", "un peu", "ça va un peu mieux", "mieux"}:
+        if lower in {"oui", "oui un peu", "un peu", "ca va un peu mieux", "ça va un peu mieux", "mieux"}:
             clear_waiting_flag(memory)
             reply = "Je suis contente de lire ça. Qu'est-ce qui t'aide le plus en ce moment ?"
             _save_exchange(memory, text, reply, "positive", "general", "precise", "encourage")
@@ -348,19 +486,23 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
 
 
 def _direct_rules(text: str, memory: dict) -> dict | None:
-    lower = text.lower().strip()
+    lower = _normalize_user_text(text)
     ensure_context(memory)
 
-    if lower in {
-        "comment tu t'appelles",
-        "tu t'appelles comment",
-        "quel est ton nom",
-        "c'est quoi ton prénom",
-        "qui es-tu",
-        "tu es qui",
-        "tu es quoi",
-    }:
-        reply = "Je m'appelle Zoé. Je suis une intelligence artificielle."
+    if _contains_any_phrase(lower, NEGATIVE_NAME_PATTERNS):
+        _clear_name(memory)
+        reply = build_wrong_name_reply()
+        _save_exchange(memory, text, reply, "unknown", "identity", "precise", "reflect")
+        return {
+            "emotion": "unknown",
+            "precision": "precise",
+            "topic": "identity",
+            "intent": "reflect",
+            "reply": reply,
+        }
+
+    if _looks_like_assistant_identity_question(lower):
+        reply = build_identity_reply()
         _save_exchange(memory, text, reply, "positive", "identity", "precise", "reflect")
         return {
             "emotion": "positive",
@@ -370,7 +512,7 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    if lower in {"et toi", "et toi ?", "toi ?", "et toi alors"}:
+    if lower in {"et toi", "toi", "et toi alors"}:
         reply = "Moi ça va bien. Merci de me le demander."
         _save_exchange(memory, text, reply, "positive", "conversation", "precise", "reflect")
         return {
@@ -381,29 +523,7 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    if lower in {
-        "et toi comment tu t'appelles",
-        "toi comment tu t'appelles",
-        "et toi tu t'appelles comment",
-        "toi tu t'appelles comment",
-        "et toi comment tu t'appelle",
-        "toi comment tu t'appelle",
-    }:
-        reply = "Je m'appelle Zoé. Je suis une intelligence artificielle."
-        _save_exchange(memory, text, reply, "positive", "identity", "precise", "reflect")
-        return {
-            "emotion": "positive",
-            "precision": "precise",
-            "topic": "identity",
-            "intent": "reflect",
-            "reply": reply,
-        }
-
-    if lower in {
-        "fais-moi une devinette",
-        "donne-moi une devinette",
-        "une devinette",
-    }:
+    if lower in RIDDLE_REQUEST_PATTERNS:
         question = "Qu'est-ce qui a des clés mais n'ouvre aucune porte ?"
         answer = "un piano"
         start_riddle(memory, question, answer)
@@ -417,7 +537,7 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    if lower in {"salut", "salut zoe", "bonjour", "hello", "coucou"}:
+    if is_greeting(lower):
         reply = _greeting_reply(memory)
 
         if "Ça va un peu mieux" in reply:
@@ -434,13 +554,7 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    if lower in {
-        "comment je m'appelle",
-        "comment je m'appelles",
-        "tu connais mon prénom",
-        "tu te souviens de mon prénom",
-        "c'est quoi mon prénom",
-    }:
+    if _looks_like_user_name_question(lower):
         reply = _reply_with_name(memory)
         _save_exchange(memory, text, reply, "unknown", "identity", "precise", "reflect")
         return {
@@ -451,7 +565,7 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    if "tu te souviens de moi" in lower or "tu te souviens de nos échanges" in lower:
+    if "tu te souviens de moi" in lower or "tu te souviens de nos echanges" in lower or "tu te souviens de nos échanges" in lower:
         reply = _reply_memory(memory)
         _save_exchange(memory, text, reply, "unknown", "memory", "precise", "reflect")
         return {
@@ -462,33 +576,10 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
             "reply": reply,
         }
 
-    if lower.startswith("je m'appelle pas ") or lower.startswith("je ne m'appelle pas "):
-        _clear_name(memory)
-        reply = "D'accord. Je retire ce prénom de ma mémoire. Donne-moi le bon si tu veux."
-        _save_exchange(memory, text, reply, "unknown", "identity", "precise", "reflect")
-        return {
-            "emotion": "unknown",
-            "precision": "precise",
-            "topic": "identity",
-            "intent": "reflect",
-            "reply": reply,
-        }
-
-    if "ce n'est pas mon prénom" in lower or "c'est pas mon prénom" in lower or "tu te trompes de prénom" in lower:
-        _clear_name(memory)
-        reply = "D'accord. Je retire ce prénom de ma mémoire. Donne-moi le bon si tu veux."
-        _save_exchange(memory, text, reply, "unknown", "identity", "precise", "reflect")
-        return {
-            "emotion": "unknown",
-            "precision": "precise",
-            "topic": "identity",
-            "intent": "reflect",
-            "reply": reply,
-        }
-
-    if lower.startswith("je m'appelle "):
+    if lower.startswith("je m appelle "):
         try:
-            name = text.split("je m'appelle", 1)[1].strip().split(" ")[0]
+            name = text.split("appelle", 1)[1].strip()
+            name = _safe_split_name(name)
             if name:
                 _save_name(memory, name)
                 reply = f"Enchantée {name.capitalize()}. Je retiens ton prénom."
@@ -503,9 +594,14 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
         except Exception:
             pass
 
-    if lower.startswith("mon prénom c'est "):
+    if lower.startswith("mon prenom c est") or lower.startswith("mon prénom c est"):
         try:
-            name = text.split("mon prénom c'est", 1)[1].strip().split(" ")[0]
+            if "mon prenom c est" in lower:
+                name = lower.replace("mon prenom c est", "", 1).strip()
+            else:
+                name = lower.replace("mon prénom c est", "", 1).strip()
+
+            name = _safe_split_name(name)
             if name:
                 _save_name(memory, name)
                 reply = f"Merci {name.capitalize()}. Je retiens ton prénom."
@@ -520,7 +616,7 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
         except Exception:
             pass
 
-    if lower in {"cava", "ça va", "ca va", "ça va ?", "ca va ?"}:
+    if lower in HOW_ARE_YOU_PATTERNS:
         name = _get_name(memory)
         if name:
             reply = f"Oui, ça va bien. Merci {name}. Et toi, comment tu te sens aujourd'hui ?"
@@ -564,6 +660,7 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
 
 def process_user_message(user_input: str, memory: dict) -> dict:
     text = user_input.strip()
+    normalized_text = _normalize_user_text(text)
     ensure_context(memory)
 
     contextual_result = _handle_contextual_reply(text, memory)
@@ -574,7 +671,7 @@ def process_user_message(user_input: str, memory: dict) -> dict:
     if direct_result is not None:
         return direct_result
 
-    if should_use_image_tool(text):
+    if should_use_image_tool(normalized_text):
         conversation = _build_conversation_history(memory)
         image_result = generate_image_reply(
             user_message=text,
@@ -607,7 +704,7 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    if should_use_web(text):
+    if should_use_web(normalized_text):
         user_name = _get_name(memory)
         conversation = _build_conversation_history(memory)
         web_result = build_web_reply(
@@ -641,7 +738,8 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    if not _is_strict_chat_message(text) and should_use_code_tool(text):
+    # Important : le code vient après les messages simples protégés
+    if not _is_protected_chat_message(normalized_text) and should_use_code_tool(normalized_text):
         conversation = _build_conversation_history(memory)
         code_result = build_code_result(
             user_message=text,
@@ -674,12 +772,24 @@ def process_user_message(user_input: str, memory: dict) -> dict:
         return result
 
     analysis = analyze_text(text, memory)
-    thought_summary = think_about_message(text, memory, analysis)
-    reply = build_final_response(text, memory, analysis, thought_summary)
+    thought = think_about_message(text, memory, analysis)
+
+    thought_payload = thought if isinstance(thought, dict) else None
+
+    reply = build_final_response(
+        analysis=analysis,
+        memory=memory,
+        thought=thought_payload,
+    )
 
     llm_result = _call_llm_reply(text, memory)
     if llm_result is not None:
-        reply = llm_result["reply"]
+        reply = build_final_response(
+            analysis=analysis,
+            model_reply=llm_result["reply"],
+            memory=memory,
+            thought=thought_payload,
+        )
         analysis["emotion"] = llm_result.get("emotion", analysis.get("emotion", "unknown"))
         analysis["topic"] = llm_result.get("topic", analysis.get("topic", "general"))
         analysis["precision"] = llm_result.get("precision", analysis.get("precision", "vague"))
@@ -691,7 +801,7 @@ def process_user_message(user_input: str, memory: dict) -> dict:
         "topic": analysis.get("topic", "general"),
         "intent": analysis.get("intent", "reflect"),
         "reply": reply,
-        "thought_summary": thought_summary,
+        "thought_summary": thought if isinstance(thought, str) else "",
         "strategy": analysis.get("strategy", ""),
         "tone": analysis.get("tone", ""),
     }
