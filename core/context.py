@@ -65,7 +65,11 @@ def close_riddle(memory: dict[str, Any]) -> None:
     ctx["last_bot_question"] = None
 
 
-def set_last_bot_question(memory: dict[str, Any], question: str, question_type: str = "general") -> None:
+def set_last_bot_question(
+    memory: dict[str, Any],
+    question: str,
+    question_type: str = "general",
+) -> None:
     """
     Enregistre la dernière question posée par Zoe.
     """
@@ -84,26 +88,38 @@ def clear_waiting_flag(memory: dict[str, Any]) -> None:
 
 
 def is_waiting_reply(memory: dict[str, Any]) -> bool:
+    """
+    Indique si Zoe attend une réponse utilisateur.
+    """
     ctx = ensure_context(memory)
     return bool(ctx.get("awaiting_user_reply", False))
 
 
 def is_riddle_mode(memory: dict[str, Any]) -> bool:
+    """
+    Indique si le mode devinette est actif.
+    """
     ctx = ensure_context(memory)
     return ctx.get("mode") == "riddle"
 
 
 def get_riddle_answer(memory: dict[str, Any]) -> str | None:
+    """
+    Retourne la réponse de la devinette en cours.
+    """
     ctx = ensure_context(memory)
-    answer = ctx.get("riddle_answer", None)
+    answer = ctx.get("riddle_answer")
     if isinstance(answer, str):
         return answer
     return None
 
 
 def get_last_question_type(memory: dict[str, Any]) -> str | None:
+    """
+    Retourne le type de la dernière question posée.
+    """
     ctx = ensure_context(memory)
-    qtype = ctx.get("last_question_type", None)
+    qtype = ctx.get("last_question_type")
     if isinstance(qtype, str):
         return qtype
     return None 
