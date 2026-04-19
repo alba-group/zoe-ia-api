@@ -26,7 +26,7 @@ from core.context import (
     start_quiz,
     start_riddle,
 )
-from core.image_tool import (
+from core.image.image_tool import (
     edit_image_reply,
     generate_image_reply,
     should_use_image_edit_tool,

@@ -9,7 +9,7 @@ import requests
 
 from core.analyzer import normalize_text
 from core.config import IMAGE_MODEL_NAME, IMAGE_SIZE, OPENAI_API_KEY, OPENAI_TIMEOUT_SECONDS
-from core.firebase_storage import upload_generated_image_bytes
+from core.image.firebase_storage import upload_generated_image_bytes
 
 
 logger = logging.getLogger("zoe.image")
