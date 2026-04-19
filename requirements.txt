@@ -2,6 +2,7 @@ openai
 python-dotenv
 requests
 rich
-pydantic 
+pydantic
 fastapi
 uvicorn
+firebase-admin==6.5.0
