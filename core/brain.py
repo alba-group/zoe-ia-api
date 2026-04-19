@@ -22,7 +22,7 @@ from core.context import (
 )
 from core.web_tool import should_use_web, build_web_reply
 from core.code_tool import should_use_code_tool, build_code_result
-from core.image_tool import should_use_image_tool, generate_image_reply
+from core.image.image_tool import should_use_image_tool, generate_image_reply
 from core.llm_client import create_llm_client, build_zoe_system_prompt
 
 from core.dictionary import (
