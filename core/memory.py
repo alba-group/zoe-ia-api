@@ -211,4 +211,4 @@ def get_last_messages(memory: dict, limit: int = 5) -> list:
     history = memory.get("history", [])
     if not isinstance(history, list):
         return []
-    return history[-limit:] 
+    return history[-limit:]
