@@ -3,8 +3,8 @@ from typing import Optional
 
 from openai import OpenAI
 
-from .firebase_storage import upload_image_bytes
-from .image_utils import (
+from core.image.firebase_storage import upload_image_bytes
+from core.image.image_utils import (
     build_edit_prompt,
     build_image_prompt,
     content_type_for_png,
