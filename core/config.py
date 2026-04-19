@@ -120,4 +120,4 @@ def validate_config() -> list[str]:
             "FIREBASE_STORAGE_BUCKET est vide : l'upload Firebase Storage ne fonctionnera pas."
         )
 
-    return warnings 
+    return warnings
