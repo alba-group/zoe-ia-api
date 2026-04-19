@@ -134,7 +134,6 @@ PROTECTED_CHAT_PREFIXES = (
     "moi c'est",
 )
 
-# Demandes image plus explicites
 IMAGE_GENERATION_PATTERNS = {
     "genere une image",
     "génère une image",
@@ -146,6 +145,7 @@ IMAGE_GENERATION_PATTERNS = {
     "crée moi une image",
     "fais moi une image",
     "fais-moi une image",
+    "fait moi une image",
     "dessine moi",
     "dessine-moi",
     "cree moi un visuel",
@@ -186,7 +186,6 @@ IMAGE_EDIT_PATTERNS = {
     "transforme cette image",
 }
 
-# Pour éviter d'envoyer du code juste parce qu'on parle de code
 CODE_DISCUSSION_PATTERNS = {
     "j aime coder",
     "j'aime coder",
@@ -451,7 +450,6 @@ def _looks_like_image_generation_request(text: str) -> bool:
     if _contains_any_phrase(text, IMAGE_GENERATION_PATTERNS):
         return True
 
-    # sécurité légère sur les demandes simples
     tokens = set(text.split())
     visual_words = {"image", "photo", "visuel", "logo", "voiture", "portrait", "affiche"}
     action_words = {"genere", "génère", "cree", "crée", "dessine", "fais", "montre"}
@@ -916,13 +914,17 @@ def process_user_message(user_input: str, memory: dict) -> dict:
     if direct_result is not None:
         return direct_result
 
-    # 2. Réponses contextuelles (devinette, prénom, follow-up)
+    # 2. Réponses contextuelles
     contextual_result = _handle_contextual_reply(text, memory)
     if contextual_result is not None:
         return contextual_result
 
     # 3. Image prioritaire si demande claire
-    if _looks_like_image_edit_request(normalized_text) or _looks_like_image_generation_request(normalized_text) or should_use_image_tool(normalized_text):
+    if (
+        _looks_like_image_edit_request(normalized_text)
+        or _looks_like_image_generation_request(normalized_text)
+        or should_use_image_tool(normalized_text)
+    ):
         clear_waiting_flag(memory)
 
         conversation = _build_conversation_history(memory)
@@ -940,6 +942,8 @@ def process_user_message(user_input: str, memory: dict) -> dict:
             "intent": image_result.get("intent", "create"),
             "reply": reply,
             "image_url": image_result.get("image_url", ""),
+            "image_base64": image_result.get("image_base64", ""),
+            "image_path": image_result.get("image_path", ""),
             "thought_summary": "mode image activé",
             "strategy": "image_generation",
             "tone": "creative",
@@ -994,7 +998,7 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    # 5. Code seulement si la demande est explicite
+    # 5. Code seulement si demande explicite
     if (
         not _is_protected_chat_message(normalized_text)
         and _looks_like_explicit_code_request(normalized_text)
