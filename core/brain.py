@@ -7,31 +7,23 @@ from core.analyzer import analyze_text, normalize_text
 from core.code_tool import build_code_result, should_use_code_tool
 from core.config import LLM_HISTORY_LIMIT, OPENAI_API_KEY
 from core.context import (
-    advance_quiz,
     clear_waiting_flag,
-    close_quiz,
     close_riddle,
     ensure_context,
     get_last_question_type,
     get_riddle_answer,
-    get_riddle_answers,
-    get_quiz_index,
-    get_quiz_question,
-    get_quiz_score,
-    get_quiz_title,
-    get_quiz_total,
-    is_quiz_mode,
     is_riddle_mode,
     set_last_bot_question,
-    start_quiz,
     start_riddle,
-)
+) 
+
 from core.image.image_tool import (
     edit_image_reply,
     generate_image_reply,
     should_use_image_edit_tool,
     should_use_image_tool,
 )
+
 from core.llm_client import build_zoe_system_prompt, create_llm_client
 from core.memory import (
     add_message_to_history,
@@ -43,6 +35,7 @@ from core.memory import (
     set_profile_name,
     update_profile_from_analysis,
 )
+
 from core.responder import build_final_response
 from core.thinker import think_about_message
 from core.utils import current_datetime_string
