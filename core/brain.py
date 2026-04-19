@@ -134,6 +134,124 @@ PROTECTED_CHAT_PREFIXES = (
     "moi c'est",
 )
 
+# Demandes image plus explicites
+IMAGE_GENERATION_PATTERNS = {
+    "genere une image",
+    "génère une image",
+    "genere moi une image",
+    "génère moi une image",
+    "cree une image",
+    "crée une image",
+    "cree moi une image",
+    "crée moi une image",
+    "fais moi une image",
+    "fais-moi une image",
+    "dessine moi",
+    "dessine-moi",
+    "cree moi un visuel",
+    "crée moi un visuel",
+    "fais moi un visuel",
+    "fais-moi un visuel",
+    "fais moi une voiture",
+    "fais-moi une voiture",
+    "fais moi un logo",
+    "fais-moi un logo",
+    "genere moi une voiture",
+    "génère moi une voiture",
+    "fais moi une voiture rouge",
+    "fais-moi une voiture rouge",
+    "image de",
+    "photo de",
+    "visuel de",
+}
+
+IMAGE_EDIT_PATTERNS = {
+    "modifie cette image",
+    "modifie l image",
+    "modifie l'image",
+    "modifie la photo",
+    "retouche cette image",
+    "retouche la photo",
+    "change le fond",
+    "change l arriere plan",
+    "change l arrière plan",
+    "enleve le fond",
+    "enlève le fond",
+    "supprime le fond",
+    "edite cette image",
+    "édite cette image",
+    "ameliore cette image",
+    "améliore cette image",
+    "corrige cette image",
+    "transforme cette image",
+}
+
+# Pour éviter d'envoyer du code juste parce qu'on parle de code
+CODE_DISCUSSION_PATTERNS = {
+    "j aime coder",
+    "j'aime coder",
+    "j adore coder",
+    "j'adore coder",
+    "j aime le code",
+    "j'aime le code",
+    "j aime la programmation",
+    "j'aime la programmation",
+    "j adore la programmation",
+    "j'adore la programmation",
+    "on peut parler de code",
+    "parlons de code",
+    "parler de code",
+    "parler programmation",
+    "ma passion c est coder",
+    "ma passion c'est coder",
+    "ma passion c est le code",
+    "ma passion c'est le code",
+    "ma passion c est creer des algorithmes",
+    "ma passion c est créer des algorithmes",
+    "ma passion j adore creer",
+    "ma passion j adore créer",
+    "je t ai pas demande de code",
+    "je t'ai pas demandé de code",
+    "je ne t ai pas demande de code",
+    "je ne t'ai pas demandé de code",
+    "pourquoi tu me donnes un code",
+    "pourquoi tu me renvoies un code",
+    "sans me donner de code",
+    "sans me coder un truc",
+    "sans code",
+    "pas de code",
+}
+
+EXPLICIT_CODE_PATTERNS = {
+    "donne moi le code",
+    "donne-moi le code",
+    "ecris moi le code",
+    "écris moi le code",
+    "écris-moi le code",
+    "montre moi le code",
+    "montre-moi le code",
+    "fais moi un script",
+    "fais-moi un script",
+    "ecris moi un script",
+    "écris moi un script",
+    "écris-moi un script",
+    "code python",
+    "script python",
+    "code kotlin",
+    "code java",
+    "code javascript",
+    "code html",
+    "code css",
+    "ecris une fonction",
+    "écris une fonction",
+    "ecris un programme",
+    "écris un programme",
+    "genere du code",
+    "génère du code",
+    "code moi",
+    "code-moi",
+}
+
 
 def _collapse_spaces(text: str) -> str:
     return " ".join(text.split())
@@ -305,6 +423,40 @@ def _is_protected_chat_message(text: str) -> bool:
         return True
 
     return any(text.startswith(prefix) for prefix in PROTECTED_CHAT_PREFIXES)
+
+
+def _looks_like_explicit_code_request(text: str) -> bool:
+    if not text:
+        return False
+
+    if _contains_any_phrase(text, CODE_DISCUSSION_PATTERNS):
+        return False
+
+    return _contains_any_phrase(text, EXPLICIT_CODE_PATTERNS)
+
+
+def _looks_like_image_edit_request(text: str) -> bool:
+    if not text:
+        return False
+    return _contains_any_phrase(text, IMAGE_EDIT_PATTERNS)
+
+
+def _looks_like_image_generation_request(text: str) -> bool:
+    if not text:
+        return False
+
+    if _looks_like_image_edit_request(text):
+        return False
+
+    if _contains_any_phrase(text, IMAGE_GENERATION_PATTERNS):
+        return True
+
+    # sécurité légère sur les demandes simples
+    tokens = set(text.split())
+    visual_words = {"image", "photo", "visuel", "logo", "voiture", "portrait", "affiche"}
+    action_words = {"genere", "génère", "cree", "crée", "dessine", "fais", "montre"}
+
+    return bool((visual_words & tokens) and (action_words & tokens))
 
 
 def _get_name(memory: dict) -> str:
@@ -547,7 +699,6 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
         if not extracted_name:
             raw_candidate = text.strip()
             normalized_candidate = _normalize_user_text(raw_candidate)
-
             words = normalized_candidate.split()
 
             if (
@@ -574,7 +725,6 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
                 "reply": reply,
             }
 
-        # Si la réponse n'est pas un prénom, on coupe le mode ask_name
         clear_waiting_flag(memory)
 
     if qtype in {"emotional_followup", "general_followup"}:
@@ -766,8 +916,13 @@ def process_user_message(user_input: str, memory: dict) -> dict:
     if direct_result is not None:
         return direct_result
 
-    # 2. Image prioritaire
-    if should_use_image_tool(normalized_text):
+    # 2. Réponses contextuelles (devinette, prénom, follow-up)
+    contextual_result = _handle_contextual_reply(text, memory)
+    if contextual_result is not None:
+        return contextual_result
+
+    # 3. Image prioritaire si demande claire
+    if _looks_like_image_edit_request(normalized_text) or _looks_like_image_generation_request(normalized_text) or should_use_image_tool(normalized_text):
         clear_waiting_flag(memory)
 
         conversation = _build_conversation_history(memory)
@@ -802,7 +957,7 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    # 3. Web prioritaire
+    # 4. Web prioritaire
     if should_use_web(normalized_text):
         clear_waiting_flag(memory)
 
@@ -839,8 +994,12 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    # 4. Code prioritaire
-    if not _is_protected_chat_message(normalized_text) and should_use_code_tool(normalized_text):
+    # 5. Code seulement si la demande est explicite
+    if (
+        not _is_protected_chat_message(normalized_text)
+        and _looks_like_explicit_code_request(normalized_text)
+        and should_use_code_tool(normalized_text)
+    ):
         clear_waiting_flag(memory)
 
         conversation = _build_conversation_history(memory)
@@ -874,12 +1033,7 @@ def process_user_message(user_input: str, memory: dict) -> dict:
 
         return result
 
-    # 5. Contexte vivant après les priorités
-    contextual_result = _handle_contextual_reply(text, memory)
-    if contextual_result is not None:
-        return contextual_result
-
-    # 6. Analyse générale
+    # 6. Analyse générale / conversation normale
     analysis = analyze_text(text, memory)
     thought = think_about_message(text, memory, analysis)
 
