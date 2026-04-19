@@ -1,12 +1,11 @@
 import os
-import base64
 import unicodedata
 from openai import OpenAI
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
-IMAGE_GENERATION_KEYWORDS = [
+GENERATION_PHRASES = [
     "genere une image",
     "génère une image",
     "genere moi une image",
@@ -17,165 +16,126 @@ IMAGE_GENERATION_KEYWORDS = [
     "crée une image",
     "cree moi une image",
     "crée moi une image",
+    "fais moi une image",
+    "fais-moi une image",
+    "fait moi une image",
+    "fait-moi une image",
+    "fais moi un visuel",
+    "fait moi un visuel",
     "dessine",
     "dessine moi",
     "dessine-moi",
+    "image de",
     "photo de",
     "illustration de",
-    "image de",
     "visuel de",
-    "fais moi une image",
-    "fais-moi une image",
-    "fais moi un visuel",
-    "fais-moi un visuel",
-    "fais moi une voiture",
-    "fais-moi une voiture",
-    "fais moi une voiture rouge",
-    "fais-moi une voiture rouge",
-    "cree un logo",
-    "crée un logo",
-    "fais moi un logo",
-    "fais-moi un logo",
 ]
 
-IMAGE_EDIT_KEYWORDS = [
+EDIT_PHRASES = [
     "modifie cette image",
     "modifie l image",
     "modifie l'image",
-    "modifie la photo",
+    "modifie le fond",
+    "modifier le fond",
+    "change le fond",
+    "changer le fond",
+    "retire le fond",
+    "retirer le fond",
+    "supprime le fond",
+    "supprimer le fond",
+    "enleve le fond",
+    "enlève le fond",
+    "mets un autre fond",
+    "mettre un autre fond",
     "retouche cette image",
     "retouche la photo",
-    "edite cette image",
-    "édite cette image",
     "ameliore cette image",
     "améliore cette image",
     "corrige cette image",
     "transforme cette image",
-    "change le fond",
-    "change l arriere plan",
-    "change l arrière plan",
-    "enleve le fond",
-    "enlève le fond",
-    "supprime le fond",
 ]
 
-VISUAL_OBJECT_WORDS = {
+VISUAL_WORDS = {
     "image",
     "photo",
     "visuel",
     "illustration",
     "dessin",
     "logo",
-    "affiche",
     "portrait",
+    "fond",
     "voiture",
     "pochette",
 }
 
-VISUAL_ACTION_WORDS = {
+ACTION_WORDS = {
     "genere",
     "génère",
     "cree",
     "crée",
     "dessine",
     "fais",
+    "fait",
     "fabrique",
-    "montre",
-    "imagine",
+    "modifie",
+    "modifier",
+    "change",
+    "changer",
+    "retouche",
+    "transforme",
 }
 
 
-def _normalize_text(text: str) -> str:
+def _normalize(text: str) -> str:
     if not isinstance(text, str):
         return ""
 
-    cleaned = text.strip().lower()
-    cleaned = cleaned.replace("’", "'")
-    cleaned = cleaned.replace("`", "'")
-    cleaned = cleaned.replace("´", "'")
-
-    cleaned = unicodedata.normalize("NFD", cleaned)
-    cleaned = "".join(ch for ch in cleaned if unicodedata.category(ch) != "Mn")
-    cleaned = " ".join(cleaned.split())
-    return cleaned
-
-
-def _contains_any(text: str, keywords: list[str]) -> bool:
-    return any(keyword in text for keyword in keywords)
-
-
-def _looks_like_generation_request(msg: str) -> bool:
-    if _contains_any(msg, IMAGE_GENERATION_KEYWORDS):
-        return True
-
-    tokens = set(msg.split())
-
-    if (tokens & VISUAL_OBJECT_WORDS) and (tokens & VISUAL_ACTION_WORDS):
-        return True
-
-    return False
-
-
-def _looks_like_edit_request(msg: str) -> bool:
-    return _contains_any(msg, IMAGE_EDIT_KEYWORDS)
+    text = text.strip().lower()
+    text = text.replace("’", "'").replace("`", "'").replace("´", "'")
+    text = unicodedata.normalize("NFD", text)
+    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    text = " ".join(text.split())
+    return text
 
 
 def should_use_image_tool(message: str) -> bool:
-    msg = _normalize_text(message)
-
+    msg = _normalize(message)
     if not msg:
         return False
 
-    if _looks_like_edit_request(msg):
+    for phrase in GENERATION_PHRASES:
+        if phrase in msg:
+            return True
+
+    for phrase in EDIT_PHRASES:
+        if phrase in msg:
+            return True
+
+    tokens = set(msg.split())
+
+    if (tokens & VISUAL_WORDS) and (tokens & ACTION_WORDS):
         return True
 
-    if _looks_like_generation_request(msg):
+    # Cas fréquents libres
+    if "voiture rouge" in msg and ("fais" in tokens or "fait" in tokens or "genere" in tokens or "génère" in tokens):
         return True
 
     return False
-
-
-def _extract_image_payload(result) -> tuple[str, str]:
-    """
-    Retourne :
-    - image_url_or_data_url
-    - raw_base64
-    """
-    image_url = ""
-    image_base64 = ""
-
-    if not hasattr(result, "data") or not result.data:
-        return image_url, image_base64
-
-    first = result.data[0]
-
-    # Cas URL directe
-    if hasattr(first, "url") and first.url:
-        image_url = first.url
-
-    # Cas base64 (fréquent avec gpt-image-1)
-    if hasattr(first, "b64_json") and first.b64_json:
-        image_base64 = first.b64_json
-        image_url = f"data:image/png;base64,{image_base64}"
-
-    return image_url, image_base64
 
 
 def generate_image_reply(user_message: str, conversation=None) -> dict:
     try:
         prompt = user_message.strip()
-        normalized = _normalize_text(prompt)
+        normalized = _normalize(prompt)
 
-        # Cas modification d'image :
-        # ce fichier ne reçoit pas encore l'image jointe réellement.
-        # Donc on renvoie une réponse claire plutôt qu'une fausse réussite.
-        if _looks_like_edit_request(normalized):
+        # Si c'est clairement une demande d'édition
+        if any(p in normalized for p in EDIT_PHRASES):
             return {
-                "emotion": "unknown",
+                "emotion": "positive",
                 "precision": "precise",
                 "topic": "image",
                 "intent": "edit",
-                "reply": "J’ai besoin de l’image à modifier pour faire cette retouche.",
+                "reply": "Modification d’image demandée.",
                 "image_url": "",
                 "image_base64": "",
             }
@@ -186,15 +146,26 @@ def generate_image_reply(user_message: str, conversation=None) -> dict:
             size="1024x1024",
         )
 
-        image_url, image_base64 = _extract_image_payload(result)
+        image_url = ""
+        image_base64 = ""
 
-        if not image_url and not image_base64:
+        if hasattr(result, "data") and result.data:
+            item = result.data[0]
+
+            if hasattr(item, "url") and item.url:
+                image_url = item.url
+
+            if hasattr(item, "b64_json") and item.b64_json:
+                image_base64 = item.b64_json
+                image_url = f"data:image/png;base64,{image_base64}"
+
+        if not image_url:
             return {
                 "emotion": "unknown",
                 "precision": "precise",
                 "topic": "image",
                 "intent": "clarify",
-                "reply": "L’image a été demandée, mais je n’ai pas reçu de résultat exploitable.",
+                "reply": "Je n'ai pas reçu d'image exploitable après la génération.",
                 "image_url": "",
                 "image_base64": "",
             }
