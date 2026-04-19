@@ -15,7 +15,7 @@ def _get_storage_bucket_name() -> str:
     bucket = os.getenv("FIREBASE_STORAGE_BUCKET", "").strip()
     if not bucket:
         raise RuntimeError(
-            "FIREBASE_STORAGE_BUCKET manquant. Exemple : zoe-ia-xxxxx.firebasestorage.app"
+            "FIREBASE_STORAGE_BUCKET manquant. Exemple : zoe-ia-5d52f.firebasestorage.app"
         )
     return bucket
 
@@ -80,6 +80,7 @@ def build_storage_path(
 ) -> str:
     clean_uid = (uid or "").strip()
     clean_file_name = (file_name or "").strip()
+    clean_folder = (folder or "").strip()
 
     if not clean_uid:
         raise ValueError("uid manquant pour le chemin Firebase Storage")
@@ -87,7 +88,10 @@ def build_storage_path(
     if not clean_file_name:
         raise ValueError("file_name manquant pour le chemin Firebase Storage")
 
-    return f"{folder}/{clean_uid}/{clean_file_name}"
+    if not clean_folder:
+        clean_folder = "images"
+
+    return f"{clean_folder}/{clean_uid}/{clean_file_name}"
 
 
 def build_download_url(bucket_name: str, blob_name: str, token: str) -> str:
@@ -113,7 +117,11 @@ def upload_image_bytes(
     bucket = get_storage_bucket()
     bucket_name = bucket.name
 
-    blob_name = build_storage_path(uid=uid, file_name=file_name, folder=folder)
+    blob_name = build_storage_path(
+        uid=uid,
+        file_name=file_name,
+        folder=folder,
+    )
     blob = bucket.blob(blob_name)
 
     download_token = str(uuid.uuid4())
@@ -136,4 +144,32 @@ def upload_image_bytes(
         "path": blob_name,
         "download_url": download_url,
         "content_type": content_type,
-    } 
+    }
+
+
+def upload_image_file(
+    *,
+    uid: str,
+    local_file_path: str,
+    file_name: str,
+    content_type: str = "image/png",
+    folder: str = "images",
+    extra_metadata: Optional[dict] = None,
+) -> dict:
+    if not local_file_path:
+        raise ValueError("local_file_path manquant")
+
+    if not os.path.exists(local_file_path):
+        raise FileNotFoundError(f"Fichier introuvable : {local_file_path}")
+
+    with open(local_file_path, "rb") as f:
+        image_bytes = f.read()
+
+    return upload_image_bytes(
+        uid=uid,
+        image_bytes=image_bytes,
+        file_name=file_name,
+        content_type=content_type,
+        folder=folder,
+        extra_metadata=extra_metadata,
+    ) 
