@@ -1,7 +1,7 @@
 import json
 import os
 
-from core.config import MEMORY_FILE, HISTORY_LIMIT
+from core.config import HISTORY_LIMIT, MEMORY_FILE
 
 
 DEFAULT_MEMORY = {
@@ -39,10 +39,17 @@ def load_memory() -> dict:
         if not isinstance(data, dict):
             return DEFAULT_MEMORY.copy()
 
-        data.setdefault("history", [])
-        data.setdefault("profile", {})
-        data.setdefault("last_emotion", "unknown")
-        data.setdefault("last_topic", "general")
+        if "history" not in data or not isinstance(data["history"], list):
+            data["history"] = []
+
+        if "profile" not in data or not isinstance(data["profile"], dict):
+            data["profile"] = {}
+
+        if "last_emotion" not in data:
+            data["last_emotion"] = "unknown"
+
+        if "last_topic" not in data:
+            data["last_topic"] = "general"
 
         return data
 
@@ -65,30 +72,28 @@ def get_profile(memory: dict) -> dict:
     Retourne le profil mémorisé.
     """
     profile = memory.get("profile", {})
-    if isinstance(profile, dict):
-        return profile
-    return {}
+    if not isinstance(profile, dict):
+        profile = {}
+        memory["profile"] = profile
+    return profile
 
 
 def get_trusted_name(memory: dict) -> str:
     """
-    Retourne le prénom utilisateur s'il existe.
+    Retourne le prénom mémorisé si disponible.
     """
     profile = get_profile(memory)
     name = profile.get("name", "")
-
     if isinstance(name, str):
         return name.strip()
-
     return ""
 
 
 def set_profile_name(memory: dict, name: str, source: str = "declared") -> None:
     """
-    Enregistre un prénom utilisateur.
+    Enregistre un prénom fiable dans le profil.
     """
     clean_name = (name or "").strip()
-
     if not clean_name:
         return
 
@@ -127,7 +132,6 @@ def apply_identity_context(
     if clean_user_name:
         profile["app_user_name"] = clean_user_name
 
-        # On peut l'utiliser comme prénom si aucun prénom fiable n'est encore mémorisé
         current_name = str(profile.get("name", "")).strip()
         if not current_name:
             profile["name"] = clean_user_name
@@ -164,8 +168,6 @@ def add_message_to_history(
         history = []
 
     history.append(item)
-
-    # limite mémoire courte
     history = history[-HISTORY_LIMIT:]
 
     memory["history"] = history
@@ -185,7 +187,6 @@ def update_profile_from_analysis(memory: dict, analysis: dict) -> None:
     profile["last_detected_emotion"] = emotion
     profile["favorite_topic"] = topic
 
-    # compteur émotion
     emotion_counter = profile.get("emotion_counter", {})
     if not isinstance(emotion_counter, dict):
         emotion_counter = {}
