@@ -1,175 +1,130 @@
 import json
+import logging
 import os
-import urllib.parse
+import re
 import uuid
-from typing import Optional
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import quote
 
 import firebase_admin
 from firebase_admin import credentials, storage
 
-
-_FIREBASE_APP = None
-
-
-def _get_storage_bucket_name() -> str:
-    bucket = os.getenv("FIREBASE_STORAGE_BUCKET", "").strip()
-    if not bucket:
-        raise RuntimeError(
-            "FIREBASE_STORAGE_BUCKET manquant. Exemple : zoe-ia-5d52f.firebasestorage.app"
-        )
-    return bucket
+from core.config import (
+    FIREBASE_SERVICE_ACCOUNT_FILE,
+    FIREBASE_SERVICE_ACCOUNT_JSON,
+    FIREBASE_STORAGE_BUCKET,
+)
 
 
-def _get_firebase_credential() -> credentials.Base:
-    service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON", "").strip()
-    service_account_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+logger = logging.getLogger("zoe.firebase_storage")
 
-    if service_account_json:
-        try:
-            data = json.loads(service_account_json)
-            return credentials.Certificate(data)
-        except Exception as exc:
-            raise RuntimeError(
-                f"FIREBASE_SERVICE_ACCOUNT_JSON invalide : {exc}"
-            ) from exc
+_APP_NAME = "zoe-storage-app"
 
+
+def _load_credentials():
+    if FIREBASE_SERVICE_ACCOUNT_JSON:
+        return credentials.Certificate(json.loads(FIREBASE_SERVICE_ACCOUNT_JSON))
+
+    service_account_path = (
+        FIREBASE_SERVICE_ACCOUNT_FILE
+        or os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    )
     if service_account_path:
-        if not os.path.exists(service_account_path):
-            raise RuntimeError(
-                f"GOOGLE_APPLICATION_CREDENTIALS introuvable : {service_account_path}"
-            )
         return credentials.Certificate(service_account_path)
 
-    raise RuntimeError(
-        "Aucun secret Firebase trouvé. "
-        "Définis FIREBASE_SERVICE_ACCOUNT_JSON ou GOOGLE_APPLICATION_CREDENTIALS."
-    )
+    return credentials.ApplicationDefault()
 
 
-def get_firebase_app():
-    global _FIREBASE_APP
-
-    if _FIREBASE_APP is not None:
-        return _FIREBASE_APP
-
-    if firebase_admin._apps:
-        _FIREBASE_APP = firebase_admin.get_app()
-        return _FIREBASE_APP
-
-    cred = _get_firebase_credential()
-    bucket_name = _get_storage_bucket_name()
-
-    _FIREBASE_APP = firebase_admin.initialize_app(
-        cred,
-        {
-            "storageBucket": bucket_name,
-        },
-    )
-    return _FIREBASE_APP
+def _get_app():
+    try:
+        return firebase_admin.get_app(_APP_NAME)
+    except ValueError:
+        app = firebase_admin.initialize_app(
+            credential=_load_credentials(),
+            options={"storageBucket": FIREBASE_STORAGE_BUCKET},
+            name=_APP_NAME,
+        )
+        logger.info("firebase-storage initialized bucket=%s", FIREBASE_STORAGE_BUCKET)
+        return app
 
 
-def get_storage_bucket():
-    app = get_firebase_app()
-    return storage.bucket(app=app)
+def _slugify(value: str, fallback: str = "image") -> str:
+    slug = re.sub(r"[^a-zA-Z0-9]+", "_", value.strip().lower()).strip("_")
+    return slug[:64] or fallback
 
 
-def build_storage_path(
-    uid: str,
-    file_name: str,
-    folder: str = "images",
-) -> str:
-    clean_uid = (uid or "").strip()
-    clean_file_name = (file_name or "").strip()
-    clean_folder = (folder or "").strip()
+def _storage_user_id(user_uid: str | None, account_key: str | None) -> str | None:
+    clean_uid = (user_uid or "").strip()
+    if clean_uid:
+        return _slugify(clean_uid, fallback="user")
 
-    if not clean_uid:
-        raise ValueError("uid manquant pour le chemin Firebase Storage")
-
-    if not clean_file_name:
-        raise ValueError("file_name manquant pour le chemin Firebase Storage")
-
-    if not clean_folder:
-        clean_folder = "images"
-
-    return f"{clean_folder}/{clean_uid}/{clean_file_name}"
+    raw = (account_key or "").strip()
+    if raw.startswith("user_") and len(raw) > 5:
+        user_key = raw[5:].split("_project_", 1)[0]
+        return _slugify(user_key, fallback="user")
+    return None
 
 
-def build_download_url(bucket_name: str, blob_name: str, token: str) -> str:
-    encoded_blob_name = urllib.parse.quote(blob_name, safe="")
-    return (
-        f"https://firebasestorage.googleapis.com/v0/b/{bucket_name}/o/"
-        f"{encoded_blob_name}?alt=media&token={token}"
-    )
+def build_generated_image_path(user_uid: str | None, account_key: str | None, prompt: str) -> str:
+    user_id = _storage_user_id(user_uid=user_uid, account_key=account_key)
+    if not user_id:
+        raise ValueError("Utilisateur non connecte. Impossible d'enregistrer l'image dans Firebase Storage.")
+    timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    prompt_slug = _slugify(prompt, fallback="generated")
+    file_name = f"generated_{timestamp}_{prompt_slug}.png"
+    return f"images/{user_id}/{file_name}"
 
 
-def upload_image_bytes(
-    *,
-    uid: str,
+def upload_generated_image_bytes(
     image_bytes: bytes,
-    file_name: str,
-    content_type: str = "image/png",
-    folder: str = "images",
-    extra_metadata: Optional[dict] = None,
-) -> dict:
+    user_uid: str | None,
+    account_key: str | None,
+    prompt: str,
+) -> dict[str, str]:
     if not image_bytes:
-        raise ValueError("image_bytes vide")
+        raise ValueError("Image bytes vides.")
+    if not FIREBASE_STORAGE_BUCKET:
+        raise ValueError("Bucket Firebase Storage non configure.")
 
-    bucket = get_storage_bucket()
-    bucket_name = bucket.name
-
-    blob_name = build_storage_path(
-        uid=uid,
-        file_name=file_name,
-        folder=folder,
+    app = _get_app()
+    bucket = storage.bucket(app=app)
+    storage_path = build_generated_image_path(
+        user_uid=user_uid,
+        account_key=account_key,
+        prompt=prompt,
     )
-    blob = bucket.blob(blob_name)
-
+    blob = bucket.blob(storage_path)
     download_token = str(uuid.uuid4())
 
-    metadata = {
+    logger.info(
+        "firebase-storage upload start bucket=%s path=%s bytes=%s uid_present=%s",
+        bucket.name,
+        storage_path,
+        len(image_bytes),
+        bool((user_uid or "").strip()),
+    )
+
+    blob.metadata = {
         "firebaseStorageDownloadTokens": download_token,
     }
+    blob.upload_from_string(image_bytes, content_type="image/png")
+    blob.patch()
 
-    if extra_metadata:
-        for key, value in extra_metadata.items():
-            metadata[str(key)] = str(value)
+    download_url = (
+        f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/"
+        f"{quote(storage_path, safe='')}?alt=media&token={download_token}"
+    )
 
-    blob.metadata = metadata
-    blob.upload_from_string(image_bytes, content_type=content_type)
-
-    download_url = build_download_url(bucket_name, blob_name, download_token)
+    logger.info(
+        "firebase-storage upload ok bucket=%s path=%s has_download_url=%s",
+        bucket.name,
+        storage_path,
+        bool(download_url),
+    )
 
     return {
-        "bucket": bucket_name,
-        "path": blob_name,
+        "storage_path": storage_path,
         "download_url": download_url,
-        "content_type": content_type,
+        "bucket": bucket.name,
     }
-
-
-def upload_image_file(
-    *,
-    uid: str,
-    local_file_path: str,
-    file_name: str,
-    content_type: str = "image/png",
-    folder: str = "images",
-    extra_metadata: Optional[dict] = None,
-) -> dict:
-    if not local_file_path:
-        raise ValueError("local_file_path manquant")
-
-    if not os.path.exists(local_file_path):
-        raise FileNotFoundError(f"Fichier introuvable : {local_file_path}")
-
-    with open(local_file_path, "rb") as f:
-        image_bytes = f.read()
-
-    return upload_image_bytes(
-        uid=uid,
-        image_bytes=image_bytes,
-        file_name=file_name,
-        content_type=content_type,
-        folder=folder,
-        extra_metadata=extra_metadata,
-    ) 
