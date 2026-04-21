@@ -1,18 +1,18 @@
 import math
 import re
-from typing import Any,
+from typing import Any, Protocol
 
-Demandes d'importation de protocole
+import requests
 
-depuis core.analyzer import normalize_text
+from core.analyzer import normalize_text
 
 
-DEFAULT_PROXIMITY_RADIUS_ METERS = 1500
+DEFAULT_PROXIMITY_RADIUS_METERS = 1500
 MIN_PROXIMITY_RADIUS_METERS = 100
 MAX_PROXIMITY_RADIUS_METERS = 50000
 
 OVERPASS_TIMEOUT_SECONDS = 12
-OVERPASS_URL = " https://overpass-api.de/api/ interpréteur "
+OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 
 PROXIMITY_MARKERS = (
     "autour de moi",
@@ -32,7 +32,7 @@ PROXIMITY_ACTIONS = (
     "trouve",
     "cherche",
     "je cherche",
-    "yat il",
+    "y a t il",
     "il y a",
     "ou est",
     "ou sont",
@@ -53,7 +53,7 @@ PLACE_TYPE_ALIASES: dict[str, set[str]] = {
     "distributeur": {"distributeur", "distributeur bancaire", "atm", "bancomat"},
     "batiment": {"batiment", "immeuble", "building"},
     "hotel": {"hotel"},
-    "café": {"café", "bar"},
+    "cafe": {"cafe", "bar"},
 }
 
 PLACE_TYPE_LABELS = {
@@ -62,7 +62,7 @@ PLACE_TYPE_LABELS = {
     "hopital": "hôpital",
     "tabac": "tabac",
     "magasin": "magasin",
-    "supermarche":"supermarché",
+    "supermarche": "supermarché",
     "boulangerie": "boulangerie",
     "station_service": "station-service",
     "distributeur": "distributeur",
@@ -73,9 +73,9 @@ PLACE_TYPE_LABELS = {
 
 OSM_TAGS = {
     "restaurant": [
-        'node["amenity"="restaurant"]' ,
+        'node["amenity"="restaurant"]',
         'node["amenity"="fast_food"]',
-        'node["amenity"="café"]',
+        'node["amenity"="cafe"]',
         'way["amenity"="restaurant"]',
         'way["amenity"="fast_food"]',
         'way["amenity"="cafe"]',
@@ -98,7 +98,7 @@ OSM_TAGS = {
         'node["shop"]',
         'way["shop"]',
     ],
-    "supermarché": [
+    "supermarche": [
         'node["shop"="supermarket"]',
         'way["shop"="supermarket"]',
     ],
@@ -127,7 +127,7 @@ OSM_TAGS = {
 }
 
 
-class NearbyPlacesProvider(Protocol) :
+class NearbyPlacesProvider(Protocol):
     def search_nearby_places(
         self,
         *,
@@ -142,7 +142,7 @@ class NearbyPlacesProvider(Protocol) :
 _nearby_places_provider: NearbyPlacesProvider | None = None
 
 
-def set_nearby_places_provider( provider: NearbyPlacesProvider | None) -> None:
+def set_nearby_places_provider(provider: NearbyPlacesProvider | None) -> None:
     global _nearby_places_provider
     _nearby_places_provider = provider
 
@@ -161,42 +161,42 @@ class OpenStreetMapProvider:
         query_parts: list[str] = []
         for selector in selectors:
             query_parts.append(
-                f"{selector}(around:{radius_ meters},{latitude},{longitude} );"
+                f"{selector}(around:{radius_meters},{latitude},{longitude});"
             )
 
         query = f"""
-[out:json][timeout:{OVERPASS_TIMEOUT_SECONDS }];
+[out:json][timeout:{OVERPASS_TIMEOUT_SECONDS}];
 (
     {" ".join(query_parts)}
 );
 out center tags;
 """
 
-        réponse = requests.get(
+        response = requests.get(
             OVERPASS_URL,
             params={"data": query},
-            timeout=OVERPASS_TIMEOUT_SECONDS ,
+            timeout=OVERPASS_TIMEOUT_SECONDS,
             headers={"User-Agent": "ZoeIA/1.0 (proximity search)"},
         )
-        réponse.raise_for_status()
+        response.raise_for_status()
 
-        données = réponse.json()
-        éléments = data.get("elements", [])
+        data = response.json()
+        elements = data.get("elements", [])
 
-        lieux: list[dict[str, Any]] = []
-        vus: set[tuple[Any, ...]] = set()
+        places: list[dict[str, Any]] = []
+        seen: set[tuple[Any, ...]] = set()
 
-        pour élément dans éléments:
-            lat = élément.get("lat")
-            lon = élément.get("lon")
+        for item in elements:
+            lat = item.get("lat")
+            lon = item.get("lon")
 
-            si lat est None ou lon est None:
-                centre = élément.get("center") ou {}
-                lat = centre.get("lat")
-                lon = centre.get("lon")
+            if lat is None or lon is None:
+                center = item.get("center") or {}
+                lat = center.get("lat")
+                lon = center.get("lon")
 
-            si lat est None ou lon est None:
-                continuer
+            if lat is None or lon is None:
+                continue
 
             lat = float(lat)
             lon = float(lon)
@@ -206,7 +206,7 @@ out center tags;
             tags = item.get("tags", {})
             name = str(tags.get("name", "")).strip()
             street = str(tags.get("addr:street", "")).strip()
-            house_number = str(tags.get("addr: housenumber", "")).strip()
+            house_number = str(tags.get("addr:housenumber", "")).strip()
             postcode = str(tags.get("addr:postcode", "")).strip()
             city = str(tags.get("addr:city", "")).strip()
 
@@ -225,11 +225,11 @@ out center tags;
 
             places.append(
                 {
-                    "nom" : nom ou _display_place_type(place_type ).title(),
-                    "adresse" : adresse,
-                    "distance_mètres" : int(distance),
-                    "latitude" : lat,
-                    "longitude" : lon,
+                    "name": name or _display_place_type(place_type).title(),
+                    "address": address,
+                    "distance_meters": int(distance),
+                    "latitude": lat,
+                    "longitude": lon,
                 }
             )
 
@@ -255,69 +255,69 @@ def _distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> floa
     return earth_radius * c
 
 
-set_nearby_places_provider( OpenStreetMapProvider())
+set_nearby_places_provider(OpenStreetMapProvider())
 
 
-def _normalize_proximity_text( message: str) -> str:
-    return normalize_text(message). remplacer("'", " ").strip()
+def _normalize_proximity_text(message: str) -> str:
+    return normalize_text(message).replace("'", " ").strip()
 
 
-def a_coordonnées_de_localisation(
+def has_location_coordinates(
     latitude: float | None,
     longitude: float | None,
 ) -> bool:
-    si latitude est None ou longitude est None:
-        retourner False
+    if latitude is None or longitude is None:
+        return False
 
-    retourner -90.0 <= float(latitude) <= 90.0 et -180.0 <= float(longitude) <= 180.0
+    return -90.0 <= float(latitude) <= 90.0 and -180.0 <= float(longitude) <= 180.0
 
 
-def extraire_type_de_lieu(message: str) -> str:
-    texte = _normalize_proximity_text( message)
-    si non texte:
-        retourner ""
+def extract_place_type(message: str) -> str:
+    text = _normalize_proximity_text(message)
+    if not text:
+        return ""
 
-    correspondances: liste[tuple[int, str]] = []
+    matches: list[tuple[int, str]] = []
 
-    pour type_de_lieu, alias dans PLACE_TYPE_ALIASES.items():
-        pour alias dans alias:
-            motif = r"\b" + re.escape(alias) + r"\b"
-            si re.search(motif, texte):
-                correspondances.append((len(alias), type_de_lieu))
+    for place_type, aliases in PLACE_TYPE_ALIASES.items():
+        for alias in aliases:
+            pattern = r"\b" + re.escape(alias) + r"\b"
+            if re.search(pattern, text):
+                matches.append((len(alias), place_type))
 
-    si non correspondances:
-        retourner ""
+    if not matches:
+        return ""
 
     matches.sort(reverse=True)
-    renvoie matches[0][1]
+    return matches[0][1]
 
 
-def _display_place_type(place_ type: str) -> str:
-    renvoie PLACE_TYPE_LABELS.get(place_ type, place_type ou "lieu")
+def _display_place_type(place_type: str) -> str:
+    return PLACE_TYPE_LABELS.get(place_type, place_type or "lieu")
 
 
-def _sanitize_radius(search_ radius_meters: int | None) -> int:
-    si search_radius_meters est None:
-        renvoie DEFAULT_PROXIMITY_RADIUS_ METERS
+def _sanitize_radius(search_radius_meters: int | None) -> int:
+    if search_radius_meters is None:
+        return DEFAULT_PROXIMITY_RADIUS_METERS
 
-    renvoie max(
+    return max(
         MIN_PROXIMITY_RADIUS_METERS,
         min(int(search_radius_meters), MAX_PROXIMITY_RADIUS_METERS),
     )
 
 
-def extract_search_radius_meters( message: str, fallback: int | None = None) -> int:
-    text = _normalize_proximity_text( message)
-    si not text:
-        renvoie _sanitize_radius(fallback)
+def extract_search_radius_meters(message: str, fallback: int | None = None) -> int:
+    text = _normalize_proximity_text(message)
+    if not text:
+        return _sanitize_radius(fallback)
 
-    kilometer_match = re.search(r"(\d+)\s*(km| kilomètre|kilomètres)", text)
-    si kilometer_match:
-        return _sanitize_radius(int( kilometer_match.group(1)) * 1000)
+    kilometer_match = re.search(r"(\d+)\s*(km|kilometre|kilometres)", text)
+    if kilometer_match:
+        return _sanitize_radius(int(kilometer_match.group(1)) * 1000)
 
-    meter_match = re.rechercher(r"(\d+)\s*(m|mètre| mètres)", texte)
-    si correspondance_mètre :
-        return _sanitize_radius(int(meter_ match.group(1)))
+    meter_match = re.search(r"(\d+)\s*(m|metre|metres)", text)
+    if meter_match:
+        return _sanitize_radius(int(meter_match.group(1)))
 
     return _sanitize_radius(fallback)
 
@@ -327,7 +327,7 @@ def should_use_proximity_search(
     latitude: float | None = None,
     longitude: float | None = None,
 ) -> bool:
-    text = _normalize_proximity_text( user_message)
+    text = _normalize_proximity_text(user_message)
     if not text:
         return False
 
@@ -337,7 +337,7 @@ def should_use_proximity_search(
 
     has_marker = any(marker in text for marker in PROXIMITY_MARKERS)
     has_action = any(action in text for action in PROXIMITY_ACTIONS)
-    has_location = has_location_coordinates( latitude, longitude)
+    has_location = has_location_coordinates(latitude, longitude)
 
     if has_marker:
         return True
@@ -377,21 +377,21 @@ def _build_base_result(
     }
 
 
-def _build_missing_place_type_ result(
+def _build_missing_place_type_result(
     *,
     latitude: float | None,
     longitude: float | None,
     search_radius_meters: int,
 ) -> dict[str, Any]:
     return _build_base_result(
-        answer="Je peux chercher autour de toi, mais j'ai besoin du type de lieu a trouver, par exemple restaurant, pharmacie ou hôpital.",
+        reply="Je peux chercher autour de toi, mais j'ai besoin du type de lieu a trouver, par exemple restaurant, pharmacie ou hôpital.",
         intent="clarify",
         place_type="",
-        search_radius_meters=search_ radius_meters,
+        search_radius_meters=search_radius_meters,
         latitude=latitude,
         longitude=longitude,
         location_required=False,
-        provider_status="pending_ query",
+        provider_status="pending_query",
         places=[],
     )
 
@@ -401,7 +401,7 @@ def _build_missing_location_result(
     place_type: str,
     search_radius_meters: int,
 ) -> dict[str, Any]:
-    place_label = _display_place_type(place_ type)
+    place_label = _display_place_type(place_type)
     return _build_base_result(
         reply=(
             f"Je peux chercher {place_label} autour de toi, "
@@ -409,35 +409,35 @@ def _build_missing_location_result(
         ),
         intent="clarify",
         place_type=place_type,
-        search_radius_meters=search_ radius_meters,
+        search_radius_meters=search_radius_meters,
         latitude=None,
         longitude=None,
         location_required=True,
-        provider_status="missing_ location",
+        provider_status="missing_location",
         places=[],
     )
 
 
-def _build_provider_not_ready_ result(
+def _build_provider_not_ready_result(
     *,
     place_type: str,
     search_radius_meters: int,
     latitude: float,
     longitude: float,
 ) -> dict[str, Any]:
-    place_label = _display_place_type(place_ type)
+    place_label = _display_place_type(place_type)
     return _build_base_result(
         reply=(
-            f"J'ai bien reçu ta position pour chercher {place_label} autour de toi, "
-            "mais aucune source locale maps/places n'est encore branchée sur ce backend."
+            f"J'ai bien recu ta position pour chercher {place_label} autour de toi, "
+            "mais aucune source locale maps/places n'est encore branchee sur ce backend."
         ),
         intent="clarify",
         place_type=place_type,
-        search_radius_meters=search_ radius_meters,
+        search_radius_meters=search_radius_meters,
         latitude=latitude,
         longitude=longitude,
         location_required=False,
-        supplier_status="not_ configure",
+        provider_status="not_configured",
         places=[],
     )
 
@@ -449,12 +449,12 @@ def _build_no_results_result(
     latitude: float,
     longitude: float,
 ) -> dict[str, Any]:
-    place_label = _display_place_type(place_ type)
+    place_label = _display_place_type(place_type)
     return _build_base_result(
-        answer=f"Je n'ai aucun résultat pour {place_label} dans le rayon demande autour de toi.",
+        reply=f"Je n'ai trouve aucun resultat pour {place_label} dans le rayon demande autour de toi.",
         intent="reflect",
         place_type=place_type,
-        search_radius_meters=search_ radius_meters,
+        search_radius_meters=search_radius_meters,
         latitude=latitude,
         longitude=longitude,
         location_required=False,
@@ -463,11 +463,11 @@ def _build_no_results_result(
     )
 
 
-def _format_places_reply(place_ type: str, places: list[dict[str, Any]]) -> str:
-    place_label = _display_place_type(place_ type)
-    lines = [f"J'ai trouvé ces résultats pour {place_label} autour de toi :"]
+def _format_places_reply(place_type: str, places: list[dict[str, Any]]) -> str:
+    place_label = _display_place_type(place_type)
+    lines = [f"J'ai trouve ces resultats pour {place_label} autour de toi :"]
 
-    pour chaque index et lieu dans enumerate(places[:5], start=1):
+    for index, place in enumerate(places[:5], start=1):
         name = str(place.get("name", "")).strip() or f"{place_label.title()} {index}"
         address = str(place.get("address", "")).strip()
         distance = place.get("distance_meters")
@@ -492,10 +492,10 @@ def _build_places_result(
     places: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return _build_base_result(
-        reply=_format_places_reply( place_type, places),
+        reply=_format_places_reply(place_type, places),
         intent="reflect",
         place_type=place_type,
-        search_radius_meters=search_radius_meters ,
+        search_radius_meters=search_radius_meters,
         latitude=latitude,
         longitude=longitude,
         location_required=False,
@@ -510,46 +510,46 @@ def build_proximity_reply(
     longitude: float | None = None,
     search_radius_meters: int | None = None,
 ) -> dict[str, Any]:
-    place_type = extract_place_type(user_message )
+    place_type = extract_place_type(user_message)
     effective_radius = extract_search_radius_meters(
         user_message,
         fallback=search_radius_meters,
     )
 
     if not place_type:
-        return _build_missing_place_type_ result(
+        return _build_missing_place_type_result(
             latitude=latitude,
             longitude=longitude,
-            search_radius_meters= effective_radius,
+            search_radius_meters=effective_radius,
         )
 
-    if not has_location_coordinates( latitude, longitude):
-        return _build_missing_location_ résultat(
-            lieu_type=place_type,
-            search_radius_meters= effective_radius,
+    if not has_location_coordinates(latitude, longitude):
+        return _build_missing_location_result(
+            place_type=place_type,
+            search_radius_meters=effective_radius,
         )
 
-    si _nearby_places_provider est None:
-        retourner _build_provider_not_ready_ résultat(
-            lieu_type=place_type,
-            search_radius_meters= effective_radius,
+    if _nearby_places_provider is None:
+        return _build_provider_not_ready_result(
+            place_type=place_type,
+            search_radius_meters=effective_radius,
             latitude=float(latitude),
             longitude=float(longitude),
         )
 
-    essayer:
-        places = _nearby_places_provider.rechercher_les_lieux_à_proximité(
+    try:
+        places = _nearby_places_provider.search_nearby_places(
             latitude=float(latitude),
             longitude=float(longitude),
             place_type=place_type,
-            radius_meters=effective_radius ,
+            radius_meters=effective_radius,
         )
     except requests.Timeout:
         return _build_base_result(
-            reply="La recherche a pris trop de temps. Réessayez dans un instant.",
+            reply="La recherche a pris trop de temps. Reessaie dans un instant.",
             intent="clarify",
             place_type=place_type,
-            search_radius_meters= effective_radius,
+            search_radius_meters=effective_radius,
             latitude=float(latitude),
             longitude=float(longitude),
             location_required=False,
@@ -561,19 +561,19 @@ def build_proximity_reply(
             reply="Le service de recherche de lieux est temporairement indisponible.",
             intent="clarify",
             place_type=place_type,
-            search_radius_meters= effective_radius,
+            search_radius_meters=effective_radius,
             latitude=float(latitude),
             longitude=float(longitude),
             location_required=False,
-            provider_status="provider_unavailable ",
+            provider_status="provider_unavailable",
             places=[],
         )
     except Exception:
         return _build_base_result(
-            reply="Je n'ai pas pu lancer la recherche de lieux à proximité pour le moment.",
+            reply="Je n'ai pas reussi a lancer la recherche de lieux a proximite pour le moment.",
             intent="clarify",
             place_type=place_type,
-            search_radius_meters= effective_radius,
+            search_radius_meters=effective_radius,
             latitude=float(latitude),
             longitude=float(longitude),
             location_required=False,
@@ -584,14 +584,14 @@ def build_proximity_reply(
     if not places:
         return _build_no_results_result(
             place_type=place_type,
-            search_radius_meters= effective_radius,
+            search_radius_meters=effective_radius,
             latitude=float(latitude),
             longitude=float(longitude),
         )
 
     return _build_places_result(
         place_type=place_type,
-        search_radius_meters= effective_radius,
+        search_radius_meters=effective_radius,
         latitude=float(latitude),
         longitude=float(longitude),
         places=places,
