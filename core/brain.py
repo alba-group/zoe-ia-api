@@ -44,6 +44,7 @@ from core.llm import generate_llm_reply
 from core.llm_client import build_zoe_system_prompt
 from core.location.proximity_service import (
     build_proximity_reply,
+    extract_place_type,
     should_use_proximity_search,
 )
 from core.memory import (
@@ -104,6 +105,122 @@ SIMPLE_INTENT_WRONG_NAME = "simple_wrong_name"
 SIMPLE_INTENT_GREETING = "simple_greeting"
 SIMPLE_INTENT_THANKS = "simple_thanks"
 SIMPLE_INTENT_HOW_ARE_YOU = "simple_how_are_you"
+
+ROUTING_INTENT_RELATIONSHIP_SUPPORT = "relationship_support"
+ROUTING_INTENT_EMOTIONAL_CONVERSATION = "emotional_conversation"
+ROUTING_INTENT_LOCAL_SEARCH = "local_search"
+ROUTING_INTENT_TASK = "task_request"
+ROUTING_INTENT_CAPABILITIES = "capabilities"
+ROUTING_INTENT_GREETING = "greeting"
+ROUTING_INTENT_SMALLTALK = "smalltalk"
+ROUTING_INTENT_FALLBACK = "fallback_conversation"
+
+RELATIONSHIP_SCORE = 100
+URGENT_EMOTION_SCORE = 95
+MAPS_SCORE = 80
+TASK_SCORE = 70
+HELP_SCORE = 40
+SMALLTALK_SCORE = 20
+FALLBACK_SCORE = 0
+
+RELATIONSHIP_KEYWORDS = [
+    "femme",
+    "mari",
+    "marie",
+    "copine",
+    "copain",
+    "divorce",
+    "separation",
+    "quitte",
+    "rupture",
+    "jalousie",
+    "je l aime",
+    "j aime une autre",
+    "amour",
+    "trompe",
+    "infidele",
+    "couple",
+    "trahi",
+    "sentiments",
+    "coeur",
+    "souffre",
+]
+
+RELATIONSHIP_SUPPORT_MARKERS = {
+    "aide moi",
+    "aide moi a",
+    "j ai un probleme",
+    "j ai besoin de parler",
+    "comment faire",
+    "que faire",
+    "je ne sais plus",
+    "parler a ma femme",
+    "parler a mon mari",
+    "parler a ma copine",
+    "parler a mon copain",
+}
+
+URGENT_EMOTION_KEYWORDS = [
+    "je vais mal",
+    "je souffre",
+    "je suis triste",
+    "je suis perdu",
+    "je suis perdue",
+    "j ai peur",
+    "j ai mal",
+    "ca me fait mal",
+    "ca fait mal",
+    "detresse",
+    "trahison",
+]
+
+EXPLICIT_CAPABILITIES_PATTERNS = {
+    "que peux tu faire",
+    "qu est ce que tu peux faire",
+    "tes capacites",
+    "quelles sont tes capacites",
+    "aide sur tes fonctions",
+    "quels modules",
+    "quels sont tes modules",
+    "qui es tu",
+    "tu es qui",
+    "comment tu marches",
+    "comment tu fonctionnes",
+    "comment tu choisis tes outils",
+    "que sais tu faire",
+}
+
+EXPLICIT_CAPABILITIES_CONTAINS = {
+    "tes capacites",
+    "tes fonctions",
+    "tes modules",
+    "quels modules",
+    "quels sont tes modules",
+    "comment tu marches",
+    "comment tu fonctionnes",
+    "comment tu choisis tes outils",
+}
+
+LOCAL_SEARCH_HINTS = {
+    "proche",
+    "proches",
+    "plus proche",
+    "a proximite",
+    "autour de moi",
+    "pres de moi",
+    "autour d ici",
+    "pres d ici",
+}
+
+LOCAL_SEARCH_ACTION_HINTS = {
+    "trouve",
+    "cherche",
+    "ou est",
+    "ou sont",
+    "localise",
+    "montre moi",
+    "donne moi",
+}
 
 PROTECTED_CHAT_EXACT = {
     "salut",
@@ -711,6 +828,10 @@ def _contains_any(text: str, patterns: set[str]) -> bool:
     return any(pattern in text for pattern in patterns)
 
 
+def _count_keyword_matches(text: str, keywords: list[str] | set[str]) -> int:
+    return sum(1 for keyword in keywords if keyword and keyword in text)
+
+
 def _normalize_simple_text(text: str) -> str:
     cleaned = normalize_text(text)
     cleaned = cleaned.replace("'", " ").replace("â€™", " ")
@@ -753,6 +874,152 @@ def _matches_variant_family(text: str, variants: set[str], threshold: float = 0.
         if _similarity(compact_text, variant.replace(" ", "")) >= threshold:
             return True
     return False
+
+
+def _has_first_person_reference(text: str) -> bool:
+    tokens = set(text.split())
+    return any(token in tokens for token in {"je", "j", "moi", "mon", "ma", "mes", "me"})
+
+
+def _looks_like_relationship_support_message(text: str) -> bool:
+    if _count_keyword_matches(text, RELATIONSHIP_KEYWORDS) == 0:
+        return False
+
+    if any(marker in text for marker in RELATIONSHIP_SUPPORT_MARKERS):
+        return True
+
+    return _has_first_person_reference(text)
+
+
+def _looks_like_urgent_emotional_message(text: str) -> bool:
+    if any(marker in text for marker in URGENT_EMOTION_KEYWORDS):
+        return True
+
+    return _count_keyword_matches(text, RELATIONSHIP_KEYWORDS) > 0
+
+
+def _looks_like_sensitive_human_message(text: str) -> bool:
+    return _looks_like_relationship_support_message(text) or _looks_like_urgent_emotional_message(text)
+
+
+def _looks_like_explicit_capabilities_request(text: str) -> bool:
+    normalized = _normalize_simple_text(text)
+    if not normalized or _looks_like_sensitive_human_message(normalized):
+        return False
+
+    if normalized in EXPLICIT_CAPABILITIES_PATTERNS:
+        return True
+
+    return any(pattern in normalized for pattern in EXPLICIT_CAPABILITIES_CONTAINS)
+
+
+def _looks_like_simple_smalltalk(text: str) -> bool:
+    normalized = _normalize_simple_text(text)
+    if not normalized or len(normalized.split()) > 4:
+        return False
+
+    simple_intent = _detect_simple_intent(text)
+    return simple_intent in {
+        SIMPLE_INTENT_GREETING,
+        SIMPLE_INTENT_THANKS,
+        SIMPLE_INTENT_HOW_ARE_YOU,
+    }
+
+
+def _looks_like_local_search_request(
+    text: str,
+    latitude: float | None = None,
+    longitude: float | None = None,
+) -> bool:
+    if should_use_proximity_search(user_message=text, latitude=latitude, longitude=longitude):
+        return True
+
+    place_type = extract_place_type(text)
+    if not place_type:
+        return False
+
+    return any(marker in text for marker in LOCAL_SEARCH_HINTS) or any(
+        action in text for action in LOCAL_SEARCH_ACTION_HINTS
+    )
+
+
+def _choose_priority_routing_intent(
+    user_message: str,
+    attached_image_url: str | None = None,
+    attached_docx_url: str | None = None,
+    attached_docx_path: str | None = None,
+    attached_pdf_url: str | None = None,
+    attached_pdf_path: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    debug: bool = False,
+) -> dict[str, Any]:
+    normalized = _normalize_simple_text(user_message)
+    text = normalize_text(user_message)
+    simple_intent = _detect_simple_intent(user_message)
+    has_attached_image = bool((attached_image_url or "").strip())
+    has_attached_docx = bool((attached_docx_url or "").strip() or (attached_docx_path or "").strip())
+    has_attached_pdf = bool((attached_pdf_url or "").strip() or (attached_pdf_path or "").strip())
+
+    relationship_score = RELATIONSHIP_SCORE if _looks_like_relationship_support_message(normalized) else 0
+    urgent_emotion_score = URGENT_EMOTION_SCORE if _looks_like_urgent_emotional_message(normalized) else 0
+    maps_score = MAPS_SCORE if _looks_like_local_search_request(
+        text=text,
+        latitude=latitude,
+        longitude=longitude,
+    ) else 0
+
+    task_detected = any(
+        (
+            _looks_like_phone_action(text),
+            _looks_like_message_action(text),
+            _looks_like_notes_action(text),
+            _looks_like_game_request(text),
+            should_use_docx_analysis_tool(user_message=text, has_attached_docx=has_attached_docx),
+            should_use_docx_tool(text),
+            should_use_pdf_analysis_tool(user_message=text, has_attached_pdf=has_attached_pdf),
+            should_use_pdf_tool(text),
+            should_use_image_edit_tool(message=text, has_attached_image=has_attached_image),
+            should_use_image_analysis_tool(message=text, has_attached_image=has_attached_image),
+            should_use_image_tool(text),
+            should_use_web(text),
+            should_use_code_tool(text) and _looks_like_explicit_technical_code_request(text),
+        )
+    )
+    task_score = TASK_SCORE if task_detected else 0
+    help_score = HELP_SCORE if _looks_like_explicit_capabilities_request(user_message) else 0
+    smalltalk_score = SMALLTALK_SCORE if _looks_like_simple_smalltalk(user_message) else 0
+
+    smalltalk_intent = (
+        ROUTING_INTENT_GREETING if simple_intent == SIMPLE_INTENT_GREETING else ROUTING_INTENT_SMALLTALK
+    )
+    scored_intents = [
+        (ROUTING_INTENT_RELATIONSHIP_SUPPORT, relationship_score),
+        (ROUTING_INTENT_EMOTIONAL_CONVERSATION, urgent_emotion_score),
+        (ROUTING_INTENT_LOCAL_SEARCH, maps_score),
+        (ROUTING_INTENT_TASK, task_score),
+        (ROUTING_INTENT_CAPABILITIES, help_score),
+        (smalltalk_intent, smalltalk_score),
+        (ROUTING_INTENT_FALLBACK, FALLBACK_SCORE),
+    ]
+    chosen_intent = max(scored_intents, key=lambda item: item[1])[0]
+
+    if debug:
+        print("[BRAIN] message =", user_message)
+        print("[BRAIN] detected_intent =", chosen_intent)
+        print("[BRAIN] relationship_score =", relationship_score)
+        print("[BRAIN] help_score =", help_score)
+        print("[BRAIN] smalltalk_score =", smalltalk_score)
+
+    return {
+        "intent": chosen_intent,
+        "relationship_score": relationship_score,
+        "urgent_emotion_score": urgent_emotion_score,
+        "maps_score": maps_score,
+        "task_score": task_score,
+        "help_score": help_score,
+        "smalltalk_score": smalltalk_score,
+    }
 
 
 def _is_wrong_name_statement(normalized: str, compact: str) -> bool:
@@ -916,7 +1183,10 @@ def _looks_like_notes_action(text: str) -> bool:
 def _looks_like_protected_chat(text: str) -> bool:
     compact_text = text.strip(" .!?;,:")
     return (
-        _detect_simple_intent(compact_text) is not None
+        _looks_like_sensitive_human_message(_normalize_simple_text(compact_text))
+        or _looks_like_explicit_capabilities_request(compact_text)
+        or _looks_like_simple_smalltalk(compact_text)
+        or _detect_simple_intent(compact_text) is not None
         or compact_text in PROTECTED_CHAT_EXACT
         or any(pattern in compact_text for pattern in PROTECTED_CHAT_CONTAINS)
     )
@@ -1776,6 +2046,12 @@ def _build_local_knowledge_result(
     zoe_identity = _get_zoe_identity()
     source = str(local_match.get("source", "knowledge")).strip() or "knowledge"
 
+    if source == "user_help":
+        if _looks_like_sensitive_human_message(_normalize_simple_text(user_text)):
+            return None
+        if not _looks_like_explicit_capabilities_request(user_text):
+            return None
+
     return {
         "emotion": "unknown",
         "precision": "precise",
@@ -1863,6 +2139,17 @@ def classify_intent(
     longitude: float | None = None,
 ) -> str:
     text = normalize_text(user_message)
+    routing_decision = _choose_priority_routing_intent(
+        user_message=user_message,
+        attached_image_url=attached_image_url,
+        attached_docx_url=attached_docx_url,
+        attached_docx_path=attached_docx_path,
+        attached_pdf_url=attached_pdf_url,
+        attached_pdf_path=attached_pdf_path,
+        latitude=latitude,
+        longitude=longitude,
+        debug=False,
+    )
     has_attached_image = bool((attached_image_url or "").strip())
     has_attached_docx = bool((attached_docx_url or "").strip() or (attached_docx_path or "").strip())
     has_attached_pdf = bool((attached_pdf_url or "").strip() or (attached_pdf_path or "").strip())
@@ -1917,6 +2204,19 @@ def classify_intent(
         has_attached_image,
     )
 
+    if routing_decision["intent"] == ROUTING_INTENT_LOCAL_SEARCH:
+        return INTENT_PROXIMITY_SEARCH
+
+    if routing_decision["intent"] in {
+        ROUTING_INTENT_RELATIONSHIP_SUPPORT,
+        ROUTING_INTENT_EMOTIONAL_CONVERSATION,
+        ROUTING_INTENT_CAPABILITIES,
+        ROUTING_INTENT_GREETING,
+        ROUTING_INTENT_SMALLTALK,
+        ROUTING_INTENT_FALLBACK,
+    }:
+        return INTENT_CHAT
+
     if _looks_like_protected_chat(text):
         return INTENT_CHAT
 
@@ -1969,8 +2269,11 @@ def classify_intent(
 
 
 def _is_deep_emotional_message(text: str, analysis: dict) -> bool:
-    lower = normalize_text(text)
+    lower = _normalize_simple_text(text)
     topic = analysis.get("topic", "general")
+
+    if _looks_like_sensitive_human_message(lower):
+        return True
 
     if topic in {"affection", "gratitude", "support", "solitude", "couple"}:
         return True
@@ -2671,6 +2974,22 @@ def process_user_message(
         longitude=longitude,
     )
 
+    routing_decision = _choose_priority_routing_intent(
+        user_message=text,
+        attached_image_url=attached_image_url,
+        attached_docx_url=attached_docx_url,
+        attached_docx_path=attached_docx_path,
+        attached_pdf_url=attached_pdf_url,
+        attached_pdf_path=attached_pdf_path,
+        latitude=latitude,
+        longitude=longitude,
+        debug=True,
+    )
+    sensitive_priority_message = routing_decision["intent"] in {
+        ROUTING_INTENT_RELATIONSHIP_SUPPORT,
+        ROUTING_INTENT_EMOTIONAL_CONVERSATION,
+    }
+
     contextual_result = _handle_contextual_reply(text, memory)
     if contextual_result is not None:
         return contextual_result
@@ -2679,22 +2998,24 @@ def process_user_message(
     if personal_info_result is not None:
         return personal_info_result
 
-    direct_result = _direct_rules(text, memory)
-    if direct_result is not None:
-        return direct_result
+    if not sensitive_priority_message:
+        direct_result = _direct_rules(text, memory)
+        if direct_result is not None:
+            return direct_result
 
-    local_knowledge_result = _build_local_knowledge_result(text, memory)
-    if local_knowledge_result is not None:
-        _save_exchange(
-            memory=memory,
-            user_text=text,
-            reply=local_knowledge_result["reply"],
-            emotion=local_knowledge_result["emotion"],
-            topic=local_knowledge_result["topic"],
-            precision=local_knowledge_result["precision"],
-            intent=local_knowledge_result["intent"],
-        )
-        return local_knowledge_result
+    if not sensitive_priority_message:
+        local_knowledge_result = _build_local_knowledge_result(text, memory)
+        if local_knowledge_result is not None:
+            _save_exchange(
+                memory=memory,
+                user_text=text,
+                reply=local_knowledge_result["reply"],
+                emotion=local_knowledge_result["emotion"],
+                topic=local_knowledge_result["topic"],
+                precision=local_knowledge_result["precision"],
+                intent=local_knowledge_result["intent"],
+            )
+            return local_knowledge_result
 
     detected_intent = classify_intent(
         text,
