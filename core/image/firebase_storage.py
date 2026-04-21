@@ -16,24 +16,41 @@ from core.config import (
     FIREBASE_STORAGE_BUCKET,
 )
 
-
 logger = logging.getLogger("zoe.firebase_storage")
 
 _APP_NAME = "zoe-storage-app"
 
 
 def _load_credentials():
-    if FIREBASE_SERVICE_ACCOUNT_JSON:
-        return credentials.Certificate(json.loads(FIREBASE_SERVICE_ACCOUNT_JSON))
+    raw_json = (FIREBASE_SERVICE_ACCOUNT_JSON or "").strip()
+
+    if raw_json:
+        try:
+            data = json.loads(raw_json)
+            logger.info("firebase credentials loaded from JSON")
+            return credentials.Certificate(data)
+        except Exception as error:
+            logger.exception("firebase credentials JSON invalid: %s", error)
+            raise
 
     service_account_path = (
         FIREBASE_SERVICE_ACCOUNT_FILE
         or os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
-    )
+    ).strip()
+
     if service_account_path:
+        path_obj = Path(service_account_path)
+        if not path_obj.exists():
+            raise FileNotFoundError(
+                f"Fichier service account introuvable: {service_account_path}"
+            )
+        logger.info("firebase credentials loaded from file")
         return credentials.Certificate(service_account_path)
 
-    return credentials.ApplicationDefault()
+    raise ValueError(
+        "Aucun credential Firebase configure. "
+        "Definis FIREBASE_SERVICE_ACCOUNT_JSON ou FIREBASE_SERVICE_ACCOUNT_FILE."
+    )
 
 
 def _get_app():
@@ -63,13 +80,21 @@ def _storage_user_id(user_uid: str | None, account_key: str | None) -> str | Non
     if raw.startswith("user_") and len(raw) > 5:
         user_key = raw[5:].split("_project_", 1)[0]
         return _slugify(user_key, fallback="user")
+
     return None
 
 
-def build_generated_image_path(user_uid: str | None, account_key: str | None, prompt: str) -> str:
+def build_generated_image_path(
+    user_uid: str | None,
+    account_key: str | None,
+    prompt: str,
+) -> str:
     user_id = _storage_user_id(user_uid=user_uid, account_key=account_key)
     if not user_id:
-        raise ValueError("Utilisateur non connecte. Impossible d'enregistrer l'image dans Firebase Storage.")
+        raise ValueError(
+            "Utilisateur non connecte. Impossible d'enregistrer l'image dans Firebase Storage."
+        )
+
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     prompt_slug = _slugify(prompt, fallback="generated")
     file_name = f"generated_{timestamp}_{prompt_slug}.png"
@@ -84,16 +109,19 @@ def upload_generated_image_bytes(
 ) -> dict[str, str]:
     if not image_bytes:
         raise ValueError("Image bytes vides.")
+
     if not FIREBASE_STORAGE_BUCKET:
         raise ValueError("Bucket Firebase Storage non configure.")
 
     app = _get_app()
     bucket = storage.bucket(app=app)
+
     storage_path = build_generated_image_path(
         user_uid=user_uid,
         account_key=account_key,
         prompt=prompt,
     )
+
     blob = bucket.blob(storage_path)
     download_token = str(uuid.uuid4())
 

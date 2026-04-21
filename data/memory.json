@@ -64,5 +64,25 @@
     "favorite_topic": "general"
   },
   "last_emotion": "positive",
-  "last_topic": "general"
+  "last_topic": "general",
+  "preferences": {},
+  "skills_enabled": {
+    "chat": true,
+    "image_create": true,
+    "image_edit": true,
+    "image_analyze": true,
+    "pdf_create": true,
+    "pdf_analyze": true,
+    "docx_create": true,
+    "docx_analyze": true,
+    "gps_local_search": true,
+    "web_search": true,
+    "code_generation": true
+  },
+  "known_locations": [],
+  "trusted_facts": {
+  },
+  "session_context": {
+  },
+  "long_term_memory": []
 }

@@ -22,6 +22,59 @@ def _safe_name(name: str) -> str:
     return ""
 
 
+def _looks_like_code_block(text: str) -> bool:
+    if not isinstance(text, str):
+        return False
+
+    stripped = text.strip().lower()
+    if stripped.startswith("```"):
+        return True
+
+    code_markers = (
+        "def ",
+        "class ",
+        "import ",
+        "from ",
+        "public class ",
+        "fun ",
+        "val ",
+        "var ",
+        "<html",
+        "console.log(",
+    )
+    return any(marker in stripped for marker in code_markers)
+
+
+def _should_prefer_plain_text(analysis: dict[str, Any] | None = None) -> bool:
+    if not isinstance(analysis, dict):
+        return False
+
+    topic = str(analysis.get("topic", "")).strip().lower()
+
+    return topic in {
+        "musique",
+        "écriture",
+        "ecriture",
+        "joie",
+        "fatigue",
+        "famille",
+        "couple",
+        "solitude",
+        "quotidien",
+        "général",
+        "general",
+        "image",
+        "projet",
+        "conversation",
+        "support",
+        "gratitude",
+        "affection",
+        "memory",
+        "identite",
+        "identity",
+    }
+
+
 def _build_from_strategy(
     strategy: str,
     tone: str,
@@ -179,9 +232,19 @@ def build_final_response(
     3. fallback simple depuis l'analyse
     """
     if model_reply and model_reply.strip():
-        return model_reply.strip()
+        clean_reply = model_reply.strip()
+
+        # Petit garde-fou :
+        # si le sujet attendu est plutôt textuel / créatif / conversationnel,
+        # on évite de faire confiance à une réponse qui ressemble visiblement à du code.
+        if _should_prefer_plain_text(analysis) and _looks_like_code_block(clean_reply):
+            if thought:
+                return build_response_from_thought(thought, memory)
+            return build_response_from_analysis(analysis or {}, memory)
+
+        return clean_reply
 
     if thought:
         return build_response_from_thought(thought, memory)
 
-    return build_response_from_analysis(analysis or {}, memory) 
+    return build_response_from_analysis(analysis or {}, memory)

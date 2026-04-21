@@ -1,0 +1,69 @@
+{
+  "categories": [
+    {
+      "name": "restaurant",
+      "keywords": ["restaurant", "resto"],
+      "description": "Lieu ou l'on sert des repas et des boissons sur place ou a emporter."
+    },
+    {
+      "name": "magasin",
+      "keywords": ["magasin", "boutique", "commerce"],
+      "description": "Lieu de vente de produits ou de services au public."
+    },
+    {
+      "name": "pharmacie",
+      "keywords": ["pharmacie"],
+      "description": "Lieu ou l'on delivre des medicaments et des produits de sante."
+    },
+    {
+      "name": "hopital",
+      "keywords": ["hopital"],
+      "description": "Etablissement de sante pour les soins, les urgences et les hospitalisations."
+    },
+    {
+      "name": "clinique",
+      "keywords": ["clinique"],
+      "description": "Etablissement de soins, souvent specialise ou prive."
+    },
+    {
+      "name": "laboratoire",
+      "keywords": ["laboratoire", "labo"],
+      "description": "Lieu d'analyses medicales, scientifiques ou techniques selon le contexte."
+    },
+    {
+      "name": "gare",
+      "keywords": ["gare"],
+      "description": "Lieu de depart, d'arrivee ou de correspondance pour les transports ferroviaires."
+    },
+    {
+      "name": "station service",
+      "keywords": ["station service", "essence"],
+      "description": "Lieu pour faire le plein de carburant et parfois acheter des produits de depannage."
+    },
+    {
+      "name": "hotel",
+      "keywords": ["hotel"],
+      "description": "Etablissement d'hebergement temporaire pour voyageurs et visiteurs."
+    },
+    {
+      "name": "banque",
+      "keywords": ["banque"],
+      "description": "Etablissement financier pour les operations bancaires et le conseil."
+    },
+    {
+      "name": "mairie",
+      "keywords": ["mairie"],
+      "description": "Batiment administratif de la commune pour les demarches locales."
+    },
+    {
+      "name": "police",
+      "keywords": ["police", "commissariat"],
+      "description": "Service ou batiment lie a la securite publique et aux depots de plainte."
+    },
+    {
+      "name": "poste",
+      "keywords": ["poste", "bureau de poste"],
+      "description": "Lieu pour le courrier, les colis et certains services administratifs ou financiers."
+    }
+  ]
+}

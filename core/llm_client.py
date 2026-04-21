@@ -1,9 +1,12 @@
+import base64
 import os
 from dataclasses import dataclass, field
 from typing import Any
 
 from dotenv import load_dotenv
 from openai import OpenAI
+
+from core.config import OPENAI_MAX_RETRIES, OPENAI_TIMEOUT_SECONDS
 
 
 load_dotenv()
@@ -42,7 +45,11 @@ class LLMClient:
         if not self.api_key:
             raise ValueError("OPENAI_API_KEY est vide dans le fichier .env")
 
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = OpenAI(
+            api_key=self.api_key,
+            timeout=OPENAI_TIMEOUT_SECONDS,
+            max_retries=OPENAI_MAX_RETRIES,
+        )
 
     def ask(
         self,
@@ -144,10 +151,13 @@ class LLMClient:
         Génération de code.
         """
         code_prompt = (
-            f"Tu es un assistant expert en développement.\n"
-            f"Tu dois écrire du code propre, complet, prêt à copier-coller.\n"
+            "Tu es un assistant expert en développement.\n"
+            "Tu réponds uniquement à une demande technique explicite.\n"
             f"Langage demandé : {language}.\n"
-            f"Réponds uniquement avec le code et quelques commentaires utiles si nécessaire.\n"
+            "Tu dois écrire un code propre, clair, complet, prêt à copier-coller.\n"
+            "Tu peux ajouter de courts commentaires utiles si nécessaire.\n"
+            "Tu ne produis ni paroles, ni texte créatif, ni bio, ni prompt artistique.\n"
+            "Tu restes strictement technique et cohérent avec la demande.\n"
         )
 
         return self.ask(
@@ -156,6 +166,83 @@ class LLMClient:
             conversation=conversation,
             temperature=0.2,
         )
+
+    def analyze_image(
+        self,
+        user_message: str,
+        image_url: str | None = None,
+        image_base64: str | None = None,
+        image_mime_type: str | None = None,
+        system_prompt: str = "",
+        conversation: list[dict[str, str]] | None = None,
+        temperature: float = 0.3,
+    ) -> LLMResult:
+        """
+        Analyse une image avec un message texte associe.
+        """
+        try:
+            image_input = self._build_image_input(
+                image_url=image_url,
+                image_base64=image_base64,
+                image_mime_type=image_mime_type,
+            )
+
+            input_payload: list[dict[str, Any]] = []
+
+            if system_prompt.strip():
+                input_payload.append(
+                    {
+                        "role": "system",
+                        "content": [
+                            {
+                                "type": "input_text",
+                                "text": system_prompt.strip(),
+                            }
+                        ],
+                    }
+                )
+
+            input_payload.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "input_text",
+                            "text": self._build_text_prompt(
+                                user_message=user_message,
+                                conversation=conversation,
+                            ),
+                        },
+                        {
+                            "type": "input_image",
+                            "image_url": image_input,
+                        },
+                    ],
+                }
+            )
+
+            response = self.client.responses.create(
+                model=self.model_name,
+                input=input_payload,
+                temperature=temperature,
+            )
+
+            return LLMResult(
+                text=self._extract_output_text(response),
+                used_web=False,
+                sources=[],
+                raw_response=response,
+                error=None,
+            )
+
+        except Exception as e:
+            return LLMResult(
+                text="",
+                used_web=False,
+                sources=[],
+                raw_response=None,
+                error=str(e),
+            )
 
     def generate_image(
         self,
@@ -237,6 +324,51 @@ class LLMClient:
 
         return "\n\n".join(parts)
 
+    def _build_image_input(
+        self,
+        image_url: str | None = None,
+        image_base64: str | None = None,
+        image_mime_type: str | None = None,
+    ) -> str:
+        if image_base64:
+            return self._build_base64_image_data_url(
+                image_base64=image_base64,
+                image_mime_type=image_mime_type,
+            )
+
+        cleaned_url = (image_url or "").strip()
+        if cleaned_url.startswith(("http://", "https://", "data:image/")):
+            return cleaned_url
+
+        if cleaned_url:
+            raise ValueError("Format d'image invalide.")
+
+        raise ValueError("Aucune image exploitable fournie.")
+
+    def _build_base64_image_data_url(
+        self,
+        image_base64: str,
+        image_mime_type: str | None = None,
+    ) -> str:
+        raw_value = image_base64.strip()
+        if not raw_value:
+            raise ValueError("image_base64 vide")
+
+        if raw_value.startswith("data:image/"):
+            return raw_value
+
+        clean_base64 = raw_value.split(",", 1)[-1].strip()
+        if not clean_base64:
+            raise ValueError("image_base64 vide")
+
+        base64.b64decode(clean_base64, validate=True)
+
+        mime_type = (image_mime_type or "image/jpeg").strip().lower()
+        if not mime_type.startswith("image/"):
+            mime_type = "image/jpeg"
+
+        return f"data:{mime_type};base64,{clean_base64}"
+
     def _extract_output_text(self, response: Any) -> str:
         """
         Extraction robuste du texte.
@@ -261,24 +393,27 @@ class LLMClient:
 
 
 def build_zoe_system_prompt(user_name: str = "") -> str:
+    identity_part = ""
     if user_name.strip():
-        return (
-            f"Tu es Zoé, une intelligence artificielle conversationnelle utile, naturelle et empathique. "
-            f"Tu parles toujours en français. "
-            f"L'utilisateur s'appelle {user_name.strip()}. "
-            f"Tu réponds avec clarté, naturel et intelligence. "
-            f"Si tu ne sais pas, tu le dis honnêtement. "
-            f"Quand on te demande du code, tu donnes un vrai code prêt à copier-coller."
-        )
+        identity_part = f"L'utilisateur s'appelle {user_name.strip()}. "
 
     return (
-        "Tu es Zoé, une intelligence artificielle conversationnelle utile, naturelle et empathique. "
+        "Tu es Zoé, une intelligence artificielle conversationnelle utile, naturelle, claire et empathique. "
         "Tu parles toujours en français. "
-        "Tu réponds avec clarté, naturel et intelligence. "
+        f"{identity_part}"
+        "Tu réponds avec naturel, intelligence et cohérence. "
         "Si tu ne sais pas, tu le dis honnêtement. "
-        "Quand on te demande du code, tu donnes un vrai code prêt à copier-coller."
+        "Tu adaptes toujours le format de sortie à la vraie demande de l'utilisateur. "
+        "Règle très importante : "
+        "si l'utilisateur demande des paroles, une chanson, un rap, un refrain, un couplet, une intro, un pont, une outro, "
+        "un prompt, une bio, une description, un texte, un scénario ou un script non technique, tu réponds en texte normal structuré et jamais en code. "
+        "Le code ne doit être donné que si la demande est explicitement technique ou de développement : "
+        "python, kotlin, java, html, css, javascript, sql, api, application, fonction, programme ou bug technique. "
+        "Le mot 'script' seul ne veut pas automatiquement dire code. "
+        "Si la demande est musicale ou créative, tu dois produire du texte exploitable directement, pas du Python. "
+        "Si l'utilisateur demande des paroles structurées, utilise des balises propres comme [Intro], [Verse 1], [Chorus], [Bridge], [Outro]."
     )
 
 
 def create_llm_client() -> LLMClient:
-    return LLMClient() 
+    return LLMClient()

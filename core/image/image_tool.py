@@ -8,14 +8,22 @@ from typing import Any
 import requests
 
 from core.analyzer import normalize_text
-from core.config import IMAGE_MODEL_NAME, IMAGE_SIZE, OPENAI_API_KEY, OPENAI_TIMEOUT_SECONDS
+from core.config import (
+    IMAGE_MODEL_NAME,
+    IMAGE_SIZE,
+    OPENAI_API_KEY,
+    OPENAI_TIMEOUT_SECONDS,
+)
 from core.image.firebase_storage import upload_generated_image_bytes
 
 
 logger = logging.getLogger("zoe.image")
+
 OPENAI_IMAGE_GENERATIONS_URL = "https://api.openai.com/v1/images/generations"
 OPENAI_IMAGE_EDITS_URL = "https://api.openai.com/v1/images/edits"
 
+# Timeout plus large pour les images, car la génération peut être lente
+IMAGE_REQUEST_TIMEOUT_SECONDS = max(float(OPENAI_TIMEOUT_SECONDS), 90.0)
 
 IMAGE_REQUEST_PATTERNS = (
     "genere moi une image de",
@@ -211,7 +219,7 @@ def _decode_image_bytes(image_base64: str | None, image_url: str | None) -> byte
         clean_base64 = image_base64.split(",", 1)[-1]
         return base64.b64decode(clean_base64)
     if image_url:
-        response = requests.get(image_url, timeout=OPENAI_TIMEOUT_SECONDS)
+        response = requests.get(image_url, timeout=IMAGE_REQUEST_TIMEOUT_SECONDS)
         response.raise_for_status()
         return response.content
     raise ValueError("Aucune image exploitable recue.")
@@ -242,6 +250,7 @@ def _upload_and_build_result(
         upload_result.get("storage_path", ""),
     )
     logger.info("%s download url ok has_url=%s", flow_label, bool(download_url))
+
     return {
         "emotion": "positive",
         "precision": "precise",
@@ -302,6 +311,7 @@ def generate_image_reply(
     account_key: str | None = None,
 ) -> dict[str, Any]:
     del conversation
+
     prompt = extract_image_prompt(user_message)
     logger.info(
         "image-create requested prompt=%s uid_present=%s account_key_present=%s",
@@ -324,43 +334,27 @@ def generate_image_reply(
         )
 
     try:
-        payload_with_b64 = {
+        payload = {
             "model": IMAGE_MODEL_NAME,
             "prompt": prompt,
             "size": IMAGE_SIZE,
-            "response_format": "b64_json",
         }
+
         response = requests.post(
             OPENAI_IMAGE_GENERATIONS_URL,
             headers=_openai_headers(json_request=True),
-            json=payload_with_b64,
-            timeout=OPENAI_TIMEOUT_SECONDS,
+            json=payload,
+            timeout=IMAGE_REQUEST_TIMEOUT_SECONDS,
         )
-
-        if not response.ok and response.status_code == 400:
-            logger.warning(
-                "openai-image-create retry without response_format status=%s body=%s",
-                response.status_code,
-                response.text[:400],
-            )
-            response = requests.post(
-                OPENAI_IMAGE_GENERATIONS_URL,
-                headers=_openai_headers(json_request=True),
-                json={
-                    "model": IMAGE_MODEL_NAME,
-                    "prompt": prompt,
-                    "size": IMAGE_SIZE,
-                },
-                timeout=OPENAI_TIMEOUT_SECONDS,
-            )
-
         response.raise_for_status()
+
         payload = response.json()
         image_bytes, revised_prompt = _extract_image_payload(
             payload=payload,
             prompt=prompt,
             flow_label="image-create",
         )
+
         return _upload_and_build_result(
             image_bytes=image_bytes,
             prompt=revised_prompt,
@@ -370,6 +364,7 @@ def generate_image_reply(
             intent="create",
             flow_label="image-create",
         )
+
     except Exception as error:
         logger.exception("image-create failure: %s", error)
         return _build_error_result(
@@ -379,8 +374,9 @@ def generate_image_reply(
 
 
 def _download_source_image(source_image_url: str, source_image_mime_type: str | None) -> tuple[Path, str]:
-    response = requests.get(source_image_url, timeout=OPENAI_TIMEOUT_SECONDS)
+    response = requests.get(source_image_url, timeout=IMAGE_REQUEST_TIMEOUT_SECONDS)
     response.raise_for_status()
+
     content_type = (
         source_image_mime_type
         or response.headers.get("Content-Type", "").strip()
@@ -388,12 +384,15 @@ def _download_source_image(source_image_url: str, source_image_mime_type: str | 
     )
     if not content_type.startswith("image/"):
         content_type = "image/jpeg"
+
     extension = mimetypes.guess_extension(content_type) or ".jpg"
     if extension == ".jpe":
         extension = ".jpg"
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=extension) as file:
         file.write(response.content)
         path = Path(file.name)
+
     logger.info(
         "image-edit source downloaded content_type=%s bytes=%s file=%s",
         content_type,
@@ -412,6 +411,7 @@ def edit_image_reply(
     account_key: str | None = None,
 ) -> dict[str, Any]:
     del conversation
+
     prompt = extract_image_edit_prompt(user_message)
     logger.info(
         "image-edit requested source_image_provided=%s prompt=%s uid_present=%s account_key_present=%s",
@@ -441,17 +441,20 @@ def edit_image_reply(
         )
 
     source_path: Path | None = None
+
     try:
         source_path, detected_mime_type = _download_source_image(
             source_image_url=source_image_url,
             source_image_mime_type=source_image_mime_type,
         )
+
         headers = _openai_headers(json_request=False)
         data = {
             "model": IMAGE_MODEL_NAME,
             "prompt": prompt,
             "size": IMAGE_SIZE,
         }
+
         with source_path.open("rb") as image_file:
             files = {
                 "image": (source_path.name, image_file, detected_mime_type),
@@ -461,15 +464,18 @@ def edit_image_reply(
                 headers=headers,
                 data=data,
                 files=files,
-                timeout=OPENAI_TIMEOUT_SECONDS,
+                timeout=IMAGE_REQUEST_TIMEOUT_SECONDS,
             )
+
         response.raise_for_status()
         payload = response.json()
+
         image_bytes, revised_prompt = _extract_image_payload(
             payload=payload,
             prompt=prompt,
             flow_label="image-edit",
         )
+
         return _upload_and_build_result(
             image_bytes=image_bytes,
             prompt=revised_prompt,
@@ -486,9 +492,10 @@ def edit_image_reply(
             reply="Je n'ai pas reussi a modifier l'image pour le moment.",
             prompt=prompt,
         )
+
     finally:
         if source_path and source_path.exists():
             try:
                 source_path.unlink()
             except OSError:
-                logger.warning("temp-image-cleanup failed file=%s", source_path)
+                logger.warning("temp-image-cleanup failed file=%s", source_path) 

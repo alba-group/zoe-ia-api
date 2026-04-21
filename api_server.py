@@ -5,11 +5,12 @@ import traceback
 import uuid
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from core.brain import process_user_message
@@ -23,17 +24,28 @@ from core.config import (
     APP_VERSION,
     CHAT_TIMEOUT_SECONDS,
     DEBUG,
+    DOCX_DIR,
     MAX_USER_MESSAGE_LENGTH,
     MODEL_NAME,
     OPENAI_API_KEY,
+    PDF_DIR,
     validate_config,
 )
-from core.memory import apply_identity_context, clear_memory, get_memory_stats, load_memory, save_memory
+from core.memory import (
+    apply_identity_context,
+    clear_memory,
+    get_memory_stats,
+    load_memory,
+    save_memory,
+)
 from core.utils import ensure_project_files, log_event
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("zoe")
+
+# Timeout minimal pour laisser le temps aux générations/modifications d'image
+EFFECTIVE_CHAT_TIMEOUT_SECONDS = max(float(CHAT_TIMEOUT_SECONDS), 120.0)
 
 
 class ChatRequest(BaseModel):
@@ -71,6 +83,64 @@ class ChatRequest(BaseModel):
         max_length=80,
         description="Type MIME de l'image jointe, si disponible.",
     )
+    attached_docx_url: str | None = Field(
+        default=None,
+        max_length=3000,
+        description="URL temporaire du document Word / DOCX joint, si disponible.",
+    )
+    attached_docx_path: str | None = Field(
+        default=None,
+        max_length=4000,
+        description="Chemin local du document Word / DOCX cote backend, si fourni.",
+    )
+    attached_docx_name: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Nom du document Word / DOCX joint, si disponible.",
+    )
+    attached_docx_mime_type: str | None = Field(
+        default=None,
+        max_length=120,
+        description="Type MIME du document Word / DOCX joint, si disponible.",
+    )
+    attached_pdf_url: str | None = Field(
+        default=None,
+        max_length=3000,
+        description="URL temporaire du PDF joint, si disponible.",
+    )
+    attached_pdf_path: str | None = Field(
+        default=None,
+        max_length=4000,
+        description="Chemin local du PDF deja disponible cote backend, si fourni.",
+    )
+    attached_pdf_name: str | None = Field(
+        default=None,
+        max_length=255,
+        description="Nom du PDF joint, si disponible.",
+    )
+    attached_pdf_mime_type: str | None = Field(
+        default=None,
+        max_length=120,
+        description="Type MIME du PDF joint, si disponible.",
+    )
+    latitude: float | None = Field(
+        default=None,
+        ge=-90.0,
+        le=90.0,
+        description="Latitude GPS reelle envoyee par le telephone, si disponible.",
+    )
+    longitude: float | None = Field(
+        default=None,
+        ge=-180.0,
+        le=180.0,
+        description="Longitude GPS reelle envoyee par le telephone, si disponible.",
+    )
+    search_radius_meters: int | None = Field(
+        default=None,
+        ge=100,
+        le=50000,
+        description="Rayon de recherche local en metres, si fourni par le client.",
+    )
 
     @field_validator("message")
     @classmethod
@@ -80,7 +150,21 @@ class ChatRequest(BaseModel):
             raise ValueError("Le message est vide.")
         return cleaned
 
-    @field_validator("uid", "account_key", "user_name", "attached_image_url", "attached_image_mime_type")
+    @field_validator(
+        "uid",
+        "account_key",
+        "user_name",
+        "attached_image_url",
+        "attached_image_mime_type",
+        "attached_docx_url",
+        "attached_docx_path",
+        "attached_docx_name",
+        "attached_docx_mime_type",
+        "attached_pdf_url",
+        "attached_pdf_path",
+        "attached_pdf_name",
+        "attached_pdf_mime_type",
+    )
     @classmethod
     def validate_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -106,6 +190,38 @@ class ChatResponse(BaseModel):
     image_mime_type: str | None = None
     image_prompt: str | None = None
     language: str | None = None
+    place_type: str | None = None
+    search_radius_meters: int | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    location_required: bool | None = None
+    provider_status: str | None = None
+    places: list[dict[str, Any]] | None = None
+    pdf_path: str | None = None
+    pdf_url: str | None = None
+    pdf_filename: str | None = None
+    pdf_mime_type: str | None = None
+    pdf_title: str | None = None
+    pdf_analysis_status: str | None = None
+    pdf_summary: str | None = None
+    pdf_key_points: list[str] | None = None
+    pdf_page_count: int | None = None
+    pdf_source_name: str | None = None
+    pdf_has_text: bool | None = None
+    pdf_question_answer: str | None = None
+    docx_path: str | None = None
+    docx_url: str | None = None
+    docx_filename: str | None = None
+    docx_mime_type: str | None = None
+    docx_title: str | None = None
+    docx_analysis_status: str | None = None
+    docx_summary: str | None = None
+    docx_key_points: list[str] | None = None
+    docx_source_name: str | None = None
+    docx_has_text: bool | None = None
+    docx_question_answer: str | None = None
+    docx_heading_titles: list[str] | None = None
+    docx_paragraph_count: int | None = None
 
 
 class MemoryResponse(BaseModel):
@@ -238,6 +354,17 @@ def process_chat_message(
     user_name: str | None = None,
     attached_image_url: str | None = None,
     attached_image_mime_type: str | None = None,
+    attached_docx_url: str | None = None,
+    attached_docx_path: str | None = None,
+    attached_docx_name: str | None = None,
+    attached_docx_mime_type: str | None = None,
+    attached_pdf_url: str | None = None,
+    attached_pdf_path: str | None = None,
+    attached_pdf_name: str | None = None,
+    attached_pdf_mime_type: str | None = None,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    search_radius_meters: int | None = None,
 ) -> dict[str, Any]:
     memory = safe_load_memory()
     return process_user_message(
@@ -250,6 +377,17 @@ def process_chat_message(
         },
         attached_image_url=attached_image_url or "",
         attached_image_mime_type=attached_image_mime_type or "",
+        attached_docx_url=attached_docx_url or "",
+        attached_docx_path=attached_docx_path or "",
+        attached_docx_name=attached_docx_name or "",
+        attached_docx_mime_type=attached_docx_mime_type or "",
+        attached_pdf_url=attached_pdf_url or "",
+        attached_pdf_path=attached_pdf_path or "",
+        attached_pdf_name=attached_pdf_name or "",
+        attached_pdf_mime_type=attached_pdf_mime_type or "",
+        latitude=latitude,
+        longitude=longitude,
+        search_radius_meters=search_radius_meters,
     )
 
 
@@ -277,6 +415,7 @@ app = FastAPI(
     openapi_tags=[
         {"name": "Core", "description": "Endpoints principaux de disponibilite et version."},
         {"name": "Chat", "description": "Discussion avec Zoe IA."},
+        {"name": "Files", "description": "Acces aux fichiers generes par Zoe."},
         {"name": "Memory", "description": "Lecture et remise a zero de la memoire locale."},
         {"name": "Ops", "description": "Informations d'exploitation et statistiques simples."},
     ],
@@ -394,12 +533,22 @@ async def stats(request: Request) -> StatsResponse:
     memory = safe_load_memory()
     stats_payload = get_memory_stats(memory)
 
+    history_count = int(stats_payload.get("history_count", 0))
+    recent_history_count = int(stats_payload.get("recent_history_count", history_count))
+
+    profile_fields_raw = stats_payload.get("profile_fields")
+    if isinstance(profile_fields_raw, int):
+        profile_fields = profile_fields_raw
+    else:
+        profile_keys = stats_payload.get("profile_keys", [])
+        profile_fields = len(profile_keys) if isinstance(profile_keys, list) else 0
+
     return StatsResponse(
-        history_count=stats_payload["history_count"],
-        recent_history_count=stats_payload["recent_history_count"],
-        profile_fields=stats_payload["profile_fields"],
-        last_emotion=stats_payload["last_emotion"],
-        last_topic=stats_payload["last_topic"],
+        history_count=history_count,
+        recent_history_count=recent_history_count,
+        profile_fields=profile_fields,
+        last_emotion=str(stats_payload.get("last_emotion", "unknown")) or "unknown",
+        last_topic=str(stats_payload.get("last_topic", "general")) or "general",
         rate_limit_window_seconds=API_RATE_LIMIT_WINDOW_SECONDS,
         rate_limit_max_requests=API_RATE_LIMIT_MAX_REQUESTS,
     )
@@ -410,11 +559,14 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
     try:
         request_guard.check(get_client_key(request), payload.message)
         logger.info(
-            "chat payload uid_present=%s account_key_present=%s attached_image=%s attached_image_mime_type=%s",
+            "chat payload uid_present=%s account_key_present=%s attached_image=%s attached_docx=%s attached_pdf=%s attached_image_mime_type=%s location_provided=%s",
             bool(payload.uid),
             bool(payload.account_key),
             bool(payload.attached_image_url),
+            bool(payload.attached_docx_url or payload.attached_docx_path),
+            bool(payload.attached_pdf_url or payload.attached_pdf_path),
             payload.attached_image_mime_type or "",
+            payload.latitude is not None and payload.longitude is not None,
         )
 
         result = await asyncio.wait_for(
@@ -426,8 +578,19 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
                 payload.user_name,
                 payload.attached_image_url,
                 payload.attached_image_mime_type,
+                payload.attached_docx_url,
+                payload.attached_docx_path,
+                payload.attached_docx_name,
+                payload.attached_docx_mime_type,
+                payload.attached_pdf_url,
+                payload.attached_pdf_path,
+                payload.attached_pdf_name,
+                payload.attached_pdf_mime_type,
+                payload.latitude,
+                payload.longitude,
+                payload.search_radius_meters,
             ),
-            timeout=CHAT_TIMEOUT_SECONDS,
+            timeout=EFFECTIVE_CHAT_TIMEOUT_SECONDS,
         )
 
         return ChatResponse(
@@ -445,6 +608,45 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
             image_mime_type=result.get("image_mime_type"),
             image_prompt=result.get("image_prompt"),
             language=result.get("language"),
+            place_type=result.get("place_type"),
+            search_radius_meters=result.get("search_radius_meters"),
+            latitude=result.get("latitude"),
+            longitude=result.get("longitude"),
+            location_required=result.get("location_required"),
+            provider_status=result.get("provider_status"),
+            places=result.get("places"),
+            pdf_path=result.get("pdf_path"),
+            pdf_url=result.get("pdf_url"),
+            pdf_filename=result.get("pdf_filename"),
+            pdf_mime_type=result.get("pdf_mime_type"),
+            pdf_title=result.get("pdf_title"),
+            pdf_analysis_status=result.get("pdf_analysis_status"),
+            pdf_summary=result.get("pdf_summary"),
+            pdf_key_points=result.get("pdf_key_points"),
+            pdf_page_count=result.get("pdf_page_count"),
+            pdf_source_name=result.get("pdf_source_name"),
+            pdf_has_text=result.get("pdf_has_text"),
+            pdf_question_answer=result.get("pdf_question_answer"),
+            docx_path=result.get("docx_path"),
+            docx_url=result.get("docx_url"),
+            docx_filename=result.get("docx_filename"),
+            docx_mime_type=result.get("docx_mime_type"),
+            docx_title=result.get("docx_title"),
+            docx_analysis_status=result.get("docx_analysis_status"),
+            docx_summary=result.get("docx_summary"),
+            docx_key_points=result.get("docx_key_points"),
+            docx_source_name=result.get("docx_source_name"),
+            docx_has_text=result.get("docx_has_text"),
+            docx_question_answer=result.get("docx_question_answer"),
+            docx_heading_titles=result.get("docx_heading_titles"),
+            docx_paragraph_count=result.get("docx_paragraph_count"),
+        )
+
+    except asyncio.TimeoutError:
+        logger.exception("Timeout /chat")
+        raise HTTPException(
+            status_code=504,
+            detail="La requete a pris trop de temps. Pour les images, reessaie dans un instant.",
         )
     except HTTPException:
         raise
@@ -452,6 +654,64 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
         logger.exception("Erreur /chat")
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _resolve_pdf_path(file_name: str) -> Path:
+    candidate = (PDF_DIR / Path(file_name).name).resolve()
+    pdf_root = PDF_DIR.resolve()
+
+    if pdf_root not in candidate.parents and candidate != pdf_root:
+        raise HTTPException(status_code=400, detail="Nom de fichier PDF invalide.")
+
+    return candidate
+
+
+def _resolve_docx_path(file_name: str) -> Path:
+    candidate = (DOCX_DIR / Path(file_name).name).resolve()
+    docx_root = DOCX_DIR.resolve()
+
+    if docx_root not in candidate.parents and candidate != docx_root:
+        raise HTTPException(status_code=400, detail="Nom de fichier DOCX invalide.")
+
+    return candidate
+
+
+@app.get(
+    "/files/pdf/{file_name}",
+    tags=["Files"],
+    summary="Telecharger un PDF genere",
+)
+async def download_pdf(file_name: str, request: Request) -> FileResponse:
+    request_guard.check(get_client_key(request))
+
+    pdf_path = _resolve_pdf_path(file_name)
+    if not pdf_path.exists() or not pdf_path.is_file():
+        raise HTTPException(status_code=404, detail="Fichier PDF introuvable.")
+
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=pdf_path.name,
+    )
+
+
+@app.get(
+    "/files/docx/{file_name}",
+    tags=["Files"],
+    summary="Telecharger un document Word genere",
+)
+async def download_docx(file_name: str, request: Request) -> FileResponse:
+    request_guard.check(get_client_key(request))
+
+    docx_path = _resolve_docx_path(file_name)
+    if not docx_path.exists() or not docx_path.is_file():
+        raise HTTPException(status_code=404, detail="Fichier DOCX introuvable.")
+
+    return FileResponse(
+        path=docx_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename=docx_path.name,
+    )
 
 
 @app.get("/memory", response_model=MemoryResponse, tags=["Memory"], summary="Resume memoire")
@@ -462,6 +722,7 @@ async def get_memory(
 ) -> MemoryResponse:
     request_guard.check(get_client_key(request))
     memory = safe_load_memory()
+
     if account_key or user_name:
         apply_identity_context(
             memory=memory,
@@ -469,6 +730,7 @@ async def get_memory(
             user_name=user_name or "",
         )
         save_memory(memory)
+
     history = memory.get("history", [])
     profile = memory.get("profile", {})
 
@@ -500,4 +762,4 @@ async def clear(request: Request) -> GenericResponse:
 async def reset_memory_endpoint(request: Request) -> GenericResponse:
     request_guard.check(get_client_key(request))
     clear_memory(preserve_profile=False)
-    return GenericResponse(message="Memoire Zoe reinitialisee.")
+    return GenericResponse(message="Memoire Zoe reinitialisee.") 

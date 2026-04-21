@@ -1,159 +1,150 @@
 import re
+import unicodedata
 from typing import Any
 
 
 NEGATIVE_KEYWORDS = {
-    "mal", "triste", "seul", "vide", "perdu", "fatigué", "fatigue",
-    "épuisé", "déprimé", "angoissé", "stressé", "stress", "pas bien",
-    "honte", "peur", "souffre", "souffrance", "pleure", "pleurer"
+    "mal", "triste", "seul", "vide", "perdu", "fatigue",
+    "epuise", "deprime", "angoisse", "stress",
+    "pas bien", "peur", "souffrance", "pleure"
 }
 
 POSITIVE_KEYWORDS = {
-    "bien", "heureux", "content", "joie", "super", "génial", "cool",
-    "motivé", "fier", "soulagé", "ravi", "merci", "amour", "aime"
+    "bien", "heureux", "content", "joie", "super",
+    "genial", "cool", "motive", "fier",
+    "soulage", "ravi", "merci", "amour", "aime"
 }
 
 ANGER_KEYWORDS = {
-    "colère", "énervé", "énervée", "furieux", "furieuse", "rage",
-    "ça m'énerve", "sa m'énerve", "agacé", "agacée"
+    "colere", "enerve", "furieux", "rage",
+    "ca m enerve", "agace"
 }
 
 STRESS_KEYWORDS = {
-    "stress", "stressé", "stressée", "angoisse", "angoissé", "angoissée",
-    "pression", "tendu", "tendue"
+    "stress", "angoisse", "pression", "tendu"
 }
 
 FATIGUE_KEYWORDS = {
-    "fatigué", "fatiguée", "épuisé", "épuisée", "crevé", "crevée",
-    "lassé", "lassée"
+    "fatigue", "epuise", "creve", "lasse"
 }
 
+
 TOPIC_KEYWORDS = {
-    "travail": {"travail", "boulot", "job", "collègue", "patron", "chef"},
-    "famille": {"famille", "frère", "soeur", "sœur", "mère", "père", "parents", "enfant", "fils", "fille"},
-    "couple": {"couple", "femme", "mari", "copine", "copain", "amour", "séparation", "relation"},
-    "santé": {"santé", "malade", "douleur", "médecin", "hôpital", "fatigue", "fatigué"},
-    "solitude": {"seul", "solitude", "abandonné", "abandonnée"},
-    "quotidien": {"journée", "matin", "soir", "aujourd'hui", "demain", "semaine"},
-    "joie": {"content", "heureux", "joie", "fête", "réussi", "bonne nouvelle"},
-    "fatigue": {"fatigue", "fatigué", "épuisé", "crevé"},
+    "travail": {"travail", "boulot", "job", "patron", "chef", "collegue"},
+    "famille": {"famille", "frere", "soeur", "mere", "pere", "parents", "enfant"},
+    "couple": {"couple", "femme", "mari", "copine", "copain", "relation", "separation"},
+    "sante": {"sante", "medecin", "hopital", "douleur", "malade"},
+    "solitude": {"seul", "solitude", "abandon"},
+    "fatigue": {"fatigue", "epuise", "creve"},
+    "musique": {"musique", "rap", "paroles", "refrain", "couplet", "suno", "chanson"},
+    "image": {"image", "photo", "logo", "affiche", "avatar", "dessin"},
+    "code": {"code", "python", "kotlin", "java", "html", "css", "javascript"},
+    "projet": {"projet", "idee", "application", "app", "business"},
+    "joie": {"heureux", "content", "joie", "bonne nouvelle"},
 }
+
+
+def strip_accents(text: str) -> str:
+    return "".join(
+        c for c in unicodedata.normalize("NFD", text)
+        if unicodedata.category(c) != "Mn"
+    )
 
 
 def normalize_text(text: str) -> str:
-    """
-    Nettoie et normalise le texte.
-    """
     text = text.strip().lower()
+    text = strip_accents(text)
+    text = re.sub(r"[^\w\s']", " ", text)
     text = re.sub(r"\s+", " ", text)
-    return text
+    return text.strip()
 
 
 def count_keyword_matches(text: str, keywords: set[str]) -> int:
     """
-    Compte combien de mots/expressions-clés apparaissent dans le texte.
+    Match plus propre mot / expression
     """
     count = 0
+
     for keyword in keywords:
-        if keyword in text:
+        pattern = r"\b" + re.escape(keyword) + r"\b"
+        if re.search(pattern, text):
             count += 1
+
     return count
 
 
 def detect_emotion(text: str) -> str:
-    """
-    Détecte une émotion probable à partir d'indices simples.
-    """
-    negative_score = count_keyword_matches(text, NEGATIVE_KEYWORDS)
-    positive_score = count_keyword_matches(text, POSITIVE_KEYWORDS)
-    anger_score = count_keyword_matches(text, ANGER_KEYWORDS)
-    stress_score = count_keyword_matches(text, STRESS_KEYWORDS)
-    fatigue_score = count_keyword_matches(text, FATIGUE_KEYWORDS)
-
     scores = {
-        "negative": negative_score,
-        "positive": positive_score,
-        "anger": anger_score,
-        "stress": stress_score,
-        "fatigue": fatigue_score,
+        "negative": count_keyword_matches(text, NEGATIVE_KEYWORDS),
+        "positive": count_keyword_matches(text, POSITIVE_KEYWORDS),
+        "anger": count_keyword_matches(text, ANGER_KEYWORDS),
+        "stress": count_keyword_matches(text, STRESS_KEYWORDS),
+        "fatigue": count_keyword_matches(text, FATIGUE_KEYWORDS),
     }
 
-    best_emotion = max(scores, key=scores.get)
-    best_score = scores[best_emotion]
+    best = max(scores, key=scores.get)
 
-    if best_score == 0:
+    if scores[best] == 0:
         return "unknown"
 
-    return best_emotion
+    return best
 
 
 def detect_precision(text: str) -> str:
-    """
-    Détecte si le message semble vague ou précis.
-    """
-    vague_patterns = [
-        "je suis pas bien",
-        "je vais pas bien",
-        "ça va pas",
-        "je suis triste",
-        "je suis content",
-        "je suis fatigué",
-        "je suis énervé",
-        "je ne sais pas",
-        "ça ne va pas"
-    ]
-
     precise_markers = {
-        "parce que", "à cause de", "avec", "depuis", "quand", "au travail",
-        "avec ma", "avec mon", "hier", "aujourd'hui", "ce matin", "ce soir"
+        "parce que",
+        "a cause de",
+        "depuis",
+        "quand",
+        "hier",
+        "aujourd hui",
+        "ce matin",
+        "ce soir",
+        "avec ma",
+        "avec mon",
+        "au travail",
     }
 
-    if text in vague_patterns:
+    if len(text.split()) <= 4:
         return "vague"
 
     for marker in precise_markers:
         if marker in text:
             return "precise"
 
-    if len(text.split()) <= 4:
-        return "vague"
+    if len(text.split()) >= 8:
+        return "precise"
 
-    return "precise"
+    return "vague"
 
 
 def detect_topic(text: str) -> str:
-    """
-    Détecte un sujet principal à partir de mots-clés.
-    """
-    topic_scores = {}
+    scores = {}
 
-    for topic, keywords in TOPIC_KEYWORDS.items():
-        topic_scores[topic] = count_keyword_matches(text, keywords)
+    for topic, words in TOPIC_KEYWORDS.items():
+        scores[topic] = count_keyword_matches(text, words)
 
-    best_topic = max(topic_scores, key=topic_scores.get)
-    best_score = topic_scores[best_topic]
+    best = max(scores, key=scores.get)
 
-    if best_score == 0:
+    if scores[best] == 0:
         return "general"
 
-    return best_topic
+    return best
 
 
-def suggest_intent(emotion: str, precision: str) -> str:
-    """
-    Suggère une intention de réponse logique.
-    """
-    if emotion in {"negative", "stress", "fatigue"} and precision == "vague":
-        return "support"
+def suggest_intent(emotion: str, precision: str, topic: str) -> str:
+    if topic in {"musique", "image", "code", "projet"}:
+        return "clarify"
 
-    if emotion in {"negative", "stress", "fatigue"} and precision == "precise":
+    if emotion in {"negative", "stress", "fatigue"}:
+        if precision == "vague":
+            return "support"
         return "reflect"
 
-    if emotion == "positive" and precision == "vague":
+    if emotion == "positive":
+        if precision == "precise":
+            return "ask_open_question"
         return "encourage"
-
-    if emotion == "positive" and precision == "precise":
-        return "ask_open_question"
 
     if emotion == "anger":
         return "clarify"
@@ -162,23 +153,19 @@ def suggest_intent(emotion: str, precision: str) -> str:
 
 
 def analyze_text(text: str, memory: dict[str, Any] | None = None) -> dict[str, Any]:
-    """
-    Analyse locale complète d'un message.
-    Le paramètre memory est accepté pour compatibilité avec brain.py,
-    même s'il n'est pas encore utilisé ici.
-    """
     memory = memory or {}
 
-    cleaned_text = normalize_text(text)
-    emotion = detect_emotion(cleaned_text)
-    precision = detect_precision(cleaned_text)
-    topic = detect_topic(cleaned_text)
-    intent = suggest_intent(emotion, precision)
+    cleaned = normalize_text(text)
+
+    emotion = detect_emotion(cleaned)
+    precision = detect_precision(cleaned)
+    topic = detect_topic(cleaned)
+    intent = suggest_intent(emotion, precision, topic)
 
     return {
-        "cleaned_text": cleaned_text,
+        "cleaned_text": cleaned,
         "emotion": emotion,
         "precision": precision,
         "topic": topic,
         "intent": intent,
-    } 
+    }

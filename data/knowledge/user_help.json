@@ -1,0 +1,154 @@
+{
+  "items": [
+    {
+      "id": "capabilities_overview",
+      "title": "Capacites de Zoe",
+      "keywords": [
+        "que peux tu faire",
+        "quelles sont tes capacites",
+        "aide",
+        "help",
+        "que sais tu faire"
+      ],
+      "description": "Je peux discuter, utiliser mes modules et guider selon le type de demande.",
+      "examples": [
+        "Que peux tu faire ?",
+        "Aide moi a comprendre tes fonctions"
+      ]
+    },
+    {
+      "id": "image_create_help",
+      "title": "Creer une image",
+      "keywords": [
+        "comment creer une image",
+        "comment generer une image",
+        "faire une image"
+      ],
+      "description": "Decris clairement le style, le sujet et le rendu souhaite pour que je genere une image.",
+      "skill": "image_create",
+      "examples": [
+        "Genere une affiche minimaliste",
+        "Cree une image de paysage doux"
+      ]
+    },
+    {
+      "id": "image_edit_help",
+      "title": "Modifier une image",
+      "keywords": [
+        "comment modifier une image",
+        "retoucher une image",
+        "changer une photo"
+      ],
+      "description": "Envoie l'image puis explique precisement ce que tu veux changer.",
+      "skill": "image_edit",
+      "examples": [
+        "Supprime le fond",
+        "Ajoute un ciel orange"
+      ]
+    },
+    {
+      "id": "image_analyze_help",
+      "title": "Analyser une image",
+      "keywords": [
+        "comment analyser une image",
+        "decrire une photo",
+        "lire une image"
+      ],
+      "description": "Envoie l'image et demande une description, une lecture de texte ou une explication.",
+      "skill": "image_analyze",
+      "examples": [
+        "Analyse cette photo",
+        "Lis le texte sur cette image"
+      ]
+    },
+    {
+      "id": "pdf_read_help",
+      "title": "Lire un PDF",
+      "keywords": [
+        "comment lire un pdf",
+        "resumer un pdf",
+        "analyser un pdf"
+      ],
+      "description": "Envoie le PDF puis demande un resume, une analyse ou une reponse a une question precise.",
+      "skill": "pdf_analyze",
+      "examples": [
+        "Resume ce PDF",
+        "Explique moi ce document PDF"
+      ]
+    },
+    {
+      "id": "pdf_create_help",
+      "title": "Creer un PDF",
+      "keywords": [
+        "comment creer un pdf",
+        "faire un pdf",
+        "exporter en pdf"
+      ],
+      "description": "Donne le contenu ou la structure voulue et je peux generer un vrai fichier PDF.",
+      "skill": "pdf_create",
+      "examples": [
+        "Fais moi un rapport en PDF",
+        "Transforme ce texte en PDF"
+      ]
+    },
+    {
+      "id": "docx_read_help",
+      "title": "Lire un document Word",
+      "keywords": [
+        "comment lire un word",
+        "analyser un docx",
+        "resumer un word"
+      ],
+      "description": "Envoie le fichier DOCX puis demande un resume, une analyse ou une explication.",
+      "skill": "docx_analyze",
+      "examples": [
+        "Analyse ce Word",
+        "Resume ce docx"
+      ]
+    },
+    {
+      "id": "docx_create_help",
+      "title": "Creer un document Word",
+      "keywords": [
+        "comment creer un word",
+        "generer un docx",
+        "faire un document word"
+      ],
+      "description": "Donne le contenu a exporter et je peux generer un vrai fichier Word / DOCX.",
+      "skill": "docx_create",
+      "examples": [
+        "Fais moi une lettre en docx",
+        "Transforme ca en Word"
+      ]
+    },
+    {
+      "id": "location_help",
+      "title": "Utiliser la localisation",
+      "keywords": [
+        "comment utiliser la localisation",
+        "recherche autour de moi",
+        "trouver autour de moi"
+      ],
+      "description": "Je peux preparer une recherche locale si le telephone m'envoie la latitude et la longitude reelles.",
+      "skill": "gps_local_search",
+      "examples": [
+        "Trouve une pharmacie autour de moi",
+        "Cherche un hopital a proximite"
+      ]
+    },
+    {
+      "id": "web_search_help",
+      "title": "Recherche web",
+      "keywords": [
+        "comment chercher sur le web",
+        "recherche web",
+        "chercher sur internet"
+      ],
+      "description": "Je peux lancer une recherche web si la demande le justifie et si la capacite est activee.",
+      "skill": "web_search",
+      "examples": [
+        "Cherche cette information sur le web"
+      ]
+    }
+  ]
+}

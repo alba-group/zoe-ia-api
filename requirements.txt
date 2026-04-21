@@ -6,3 +6,6 @@ pydantic
 fastapi
 uvicorn
 firebase-admin==6.5.0
+reportlab
+pypdf
+python-docx

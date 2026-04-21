@@ -6,12 +6,17 @@ from core.config import (
     DATA_DIR,
     DOCS_DIR,
     TESTS_DIR,
+    DOCX_DIR,
+    KNOWLEDGE_DIR,
+    PERSONALITY_DIR,
+    PDF_DIR,
     MEMORY_FILE,
     PROFILE_FILE,
     HISTORY_FILE,
     LOG_FILE,
     TIMEZONE,
 )
+from core.skills.skill_registry import get_default_skill_flags
 
 
 def current_datetime_string() -> str:
@@ -56,14 +61,40 @@ def ensure_project_files() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
     TESTS_DIR.mkdir(parents=True, exist_ok=True)
+    PDF_DIR.mkdir(parents=True, exist_ok=True)
+    DOCX_DIR.mkdir(parents=True, exist_ok=True)
+    KNOWLEDGE_DIR.mkdir(parents=True, exist_ok=True)
+    PERSONALITY_DIR.mkdir(parents=True, exist_ok=True)
 
     ensure_json_file(
         MEMORY_FILE,
         {
             "history": [],
-            "profile": {},
+            "profile": {
+                "name": "",
+                "city": "",
+                "job": "",
+                "likes": [],
+                "dislikes": [],
+                "projects": [],
+                "goals": [],
+                "important_people": [],
+                "habits": [],
+                "preferred_tone": "",
+                "last_update": "",
+            },
             "last_emotion": "unknown",
-            "last_topic": "general"
+            "last_topic": "general",
+            "preferences": {},
+            "skills_enabled": get_default_skill_flags(),
+            "known_locations": [],
+            "trusted_facts": {},
+            "session_context": {
+                "mood": "",
+                "energy": "",
+                "current_topic": "",
+            },
+            "long_term_memory": [],
         }
     )
 
