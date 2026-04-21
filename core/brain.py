@@ -60,6 +60,7 @@ from core.memory import (
     forget_profile_field,
     get_last_messages,
     get_profile,
+    get_profile_snapshot,
     get_session_context,
     get_trusted_name,
     save_memory,
@@ -997,6 +998,52 @@ def _reply_with_likes(memory: dict) -> str:
     return "Je n'ai pas encore retenu ce que tu aimes. Tu peux me le dire si tu veux."
 
 
+def _join_profile_parts(parts: list[str]) -> str:
+    clean_parts = [str(part).strip() for part in parts if str(part).strip()]
+    if not clean_parts:
+        return ""
+    if len(clean_parts) == 1:
+        return clean_parts[0]
+    if len(clean_parts) == 2:
+        return f"{clean_parts[0]} et {clean_parts[1]}"
+    return ", ".join(clean_parts[:-1]) + f" et {clean_parts[-1]}"
+
+
+def _format_like_summary_value(value: str) -> str:
+    clean_value = str(value).strip()
+    normalized_value = normalize_text(clean_value)
+    if normalized_value == "rap":
+        return "le rap"
+    return clean_value
+
+
+def _reply_with_self_summary(memory: dict) -> str:
+    profile = get_profile_snapshot(memory)
+    name = str(profile.get("name", "")).strip()
+    city = str(profile.get("city", "")).strip()
+    likes = profile.get("likes", [])
+
+    clean_likes = (
+        [_format_like_summary_value(item) for item in likes if str(item).strip()]
+        if isinstance(likes, list)
+        else []
+    )
+
+    parts: list[str] = []
+    if name:
+        parts.append(f"Tu t'appelles {name}")
+    if city:
+        parts.append(f"tu habites {city}")
+    if clean_likes:
+        parts.append(f"tu aimes {_join_profile_parts(clean_likes)}")
+
+    if not parts:
+        return "Je n'ai pas encore assez d'informations sur toi. Tu peux me parler de ton prenom, de ta ville ou de ce que tu aimes."
+
+    sentence = _join_profile_parts(parts)
+    return sentence[:1].upper() + sentence[1:] + "."
+
+
 def _build_profile_summary(memory: dict) -> str:
     profile = get_profile(memory)
 
@@ -1116,6 +1163,25 @@ def _handle_profile_question(text: str, memory: dict) -> dict[str, Any] | None:
     compact = _compact_simple_text(text)
 
     if compact in {
+        "quijesuis",
+        "quisuisje",
+        "tusaisquijesuis",
+    } or normalized in {
+        "qui je suis",
+        "qui suis je",
+        "tu sais qui je suis",
+    }:
+        reply = _reply_with_self_summary(memory)
+        _save_exchange(memory, text, reply, "unknown", "identity", "precise", "reflect")
+        return {
+            "emotion": "unknown",
+            "precision": "precise",
+            "topic": "identity",
+            "intent": "reflect",
+            "reply": reply,
+        }
+
+    if compact in {
         "oujhabite",
         "tusaisoujhabite",
         "dansquellevillejhabite",
@@ -1183,6 +1249,33 @@ def _extract_person_name_from_relation(value: str) -> str:
         return f"{tokens[0]} {tokens[1]}".strip()
 
     return tokens[0]
+
+
+def _split_personal_info_clauses(text: str) -> list[str]:
+    compact_text = re.sub(r"\s+", " ", str(text or "").strip())
+    if not compact_text:
+        return []
+
+    raw_chunks = re.split(r"[,;\n]+", compact_text)
+    clauses: list[str] = []
+
+    for raw_chunk in raw_chunks:
+        chunk = raw_chunk.strip(" .!?")
+        if not chunk:
+            continue
+
+        sub_chunks = re.split(
+            r"\s+et\s+(?=(?:j(?:['’]|\s)|je\b|mon\b|ma\b|mes\b|moi\b))",
+            chunk,
+            flags=re.IGNORECASE,
+        )
+
+        for sub_chunk in sub_chunks:
+            clause = sub_chunk.strip(" .!?")
+            if clause:
+                clauses.append(clause)
+
+    return clauses
 
 
 def _extract_personal_info_legacy(text: str) -> dict[str, str] | None:
@@ -1366,6 +1459,39 @@ def _extract_personal_info(text: str) -> dict[str, str] | None:
     return None
 
 
+def _extract_personal_info_items(text: str) -> list[dict[str, str]]:
+    clauses = _split_personal_info_clauses(text)
+    if not clauses:
+        return []
+
+    extracted_items: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+
+    for clause in clauses:
+        extracted_info = _extract_personal_info(clause)
+        if extracted_info is None:
+            continue
+
+        field = str(extracted_info.get("field", "")).strip()
+        value = str(extracted_info.get("value", "")).strip()
+        if not field or not value:
+            continue
+
+        dedupe_key = (field, normalize_text(value))
+        if dedupe_key in seen:
+            continue
+
+        seen.add(dedupe_key)
+        extracted_items.append(
+            {
+                "field": field,
+                "value": value,
+            }
+        )
+
+    return extracted_items
+
+
 def _build_personal_info_reply(field: str, value: str) -> tuple[str, str]:
     if field == "name":
         return f"Enchantee {value}. Je retiens ton prenom.", "identity"
@@ -1441,18 +1567,32 @@ def _store_personal_info(memory: dict, field: str, value: str) -> str:
 
 
 def _handle_personal_info(text: str, memory: dict) -> dict[str, Any] | None:
-    extracted_info = _extract_personal_info(text)
-    if extracted_info is None:
+    extracted_items = _extract_personal_info_items(text)
+    if not extracted_items:
         return None
 
-    field = extracted_info["field"]
-    stored_value = _store_personal_info(memory, field, extracted_info["value"])
-    if not stored_value:
+    replies: list[str] = []
+    topics: list[str] = []
+
+    for extracted_info in extracted_items:
+        field = extracted_info["field"]
+        stored_value = _store_personal_info(memory, field, extracted_info["value"])
+        if not stored_value:
+            continue
+
+        reply, topic = _build_personal_info_reply(field, stored_value)
+        if reply and reply not in replies:
+            replies.append(reply)
+        if topic:
+            topics.append(topic)
+
+    if not replies:
         return None
 
-    reply, topic = _build_personal_info_reply(field, stored_value)
-    if not reply:
-        return None
+    reply = " ".join(replies)
+    topic = topics[0] if topics else "profile"
+    if len(set(topics)) > 1:
+        topic = "profile"
 
     if reply.endswith("?"):
         set_last_bot_question(memory, reply, "general_followup")
