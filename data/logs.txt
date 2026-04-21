@@ -147,3 +147,13 @@
 [2026-04-18 18:37:00] Fermeture normale de Zoe.
 [2026-04-18 18:37:16] Démarrage de Zoe.
 [2026-04-21 13:46:25] Fermeture normale de Zoe.
+[2026-04-21 14:08:35] Démarrage de Zoe.
+[2026-04-21 14:10:12] Message traité | emotion=unknown | topic=faq | precision=precise | intent=reflect
+[2026-04-21 14:12:09] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-21 14:12:22] Message traité | emotion=unknown | topic=identity | precision=precise | intent=reflect
+[2026-04-21 14:12:34] Fermeture normale de Zoe.
+[2026-04-21 14:12:48] Démarrage de Zoe.
+[2026-04-21 14:12:57] Message traité | emotion=unknown | topic=faq | precision=precise | intent=reflect
+[2026-04-21 14:13:15] Message traité | emotion=positive | topic=identity | precision=precise | intent=encourage
+[2026-04-21 14:13:38] Message traité | emotion=positive | topic=location | precision=precise | intent=encourage
+[2026-04-21 14:13:49] Message traité | emotion=unknown | topic=identity | precision=precise | intent=reflect
