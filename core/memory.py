@@ -114,6 +114,34 @@ def get_profile(memory: dict) -> dict:
     return profile
 
 
+def get_profile_snapshot(memory: dict) -> dict[str, Any]:
+    """
+    Retourne une vue nettoyee du profil utile pour les reponses.
+    """
+    profile = get_profile(memory)
+    snapshot = deepcopy(DEFAULT_PROFILE)
+
+    for field in DEFAULT_PROFILE:
+        value = profile.get(field, deepcopy(DEFAULT_PROFILE[field]))
+
+        if field in PROFILE_LIST_FIELDS:
+            if isinstance(value, str):
+                value = [value]
+            elif not isinstance(value, list):
+                value = []
+
+            snapshot[field] = [
+                _normalize_profile_text(item)
+                for item in value
+                if _normalize_profile_text(item)
+            ][-20:]
+            continue
+
+        snapshot[field] = _normalize_profile_text(value)
+
+    return snapshot
+
+
 def get_preferences(memory: dict) -> dict:
     preferences = memory.get("preferences", {})
     if not isinstance(preferences, dict):
