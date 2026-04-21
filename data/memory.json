@@ -1,110 +1,110 @@
 {
   "history": [
     {
-      "timestamp": "2026-04-21 13:30:34",
-      "user_message": "comment je m'appelle ?",
-      "zoe_reply": "Tu m'as dit t'appeler Alba.",
+      "timestamp": "2026-04-21 17:02:18",
+      "user_message": "tu mais ce que du vais",
+      "zoe_reply": "D'accord, dis-moi quel contenu tu aimerais inclure dans le PDF. Cela peut être du texte, des idées, des informations spécifiques ou tout autre chose que tu souhaites. Je suis là pour t'aider à le structurer !",
       "emotion": "unknown",
-      "topic": "identity",
-      "precision": "precise",
-      "intent": "reflect"
-    },
-    {
-      "timestamp": "2026-04-21 13:32:00",
-      "user_message": "j'habite Sète",
-      "zoe_reply": "Sète a une vraie identite. J'en prends note.",
-      "emotion": "positive",
-      "topic": "location",
-      "precision": "precise",
-      "intent": "encourage"
-    },
-    {
-      "timestamp": "2026-04-21 13:32:10",
-      "user_message": "je travaille dans l'aide à domicile",
-      "zoe_reply": "C'est un metier humain et precieux. Je retiens ca.",
-      "emotion": "positive",
-      "topic": "work",
-      "precision": "precise",
-      "intent": "encourage"
-    },
-    {
-      "timestamp": "2026-04-21 13:32:20",
-      "user_message": "j'aime le rap",
-      "zoe_reply": "Le rap a beaucoup de styles. Tu ecoutes quoi en ce moment ?",
-      "emotion": "positive",
-      "topic": "preferences",
-      "precision": "precise",
-      "intent": "encourage"
-    },
-    {
-      "timestamp": "2026-04-21 13:32:31",
-      "user_message": "mon projet est de créer une IA",
-      "zoe_reply": "Je t'écoute, Alba. Tu peux m'en dire un peu plus ?",
-      "emotion": "unknown",
-      "topic": "projet",
+      "topic": "general",
       "precision": "vague",
       "intent": "clarify"
     },
     {
-      "timestamp": "2026-04-21 14:10:12",
-      "user_message": "bonjour zoe, qui es-tu ?",
-      "zoe_reply": "Je suis Zoe, une assistante intelligente en francais. Je reste claire, utile et j'utilise mes modules quand ils sont disponibles.",
+      "timestamp": "2026-04-21 17:02:40",
+      "user_message": "informations",
+      "zoe_reply": "Pour créer un PDF avec des informations, pourrais-tu préciser le type d'informations que tu souhaites inclure ? Par exemple, est-ce que ce sont des informations sur un sujet particulier, des conseils, des faits intéressants, ou autre chose ? Plus tu seras précise, mieux je pourrai t'aider !",
       "emotion": "unknown",
-      "topic": "faq",
+      "topic": "general",
+      "precision": "vague",
+      "intent": "clarify"
+    },
+    {
+      "timestamp": "2026-04-21 17:03:02",
+      "user_message": "lettre d'amour",
+      "zoe_reply": "Ca fait plaisir a entendre. Ça fait plaisir à entendre. C'est une bonne nouvelle. Qu'est-ce qui t'a rendu content aujourd'hui ?",
+      "emotion": "positive",
+      "topic": "general",
+      "precision": "vague",
+      "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-21 17:03:43",
+      "user_message": "cree moi un fichier pdf lettre d'amour",
+      "zoe_reply": "Ton PDF est pret.",
+      "emotion": "positive",
+      "topic": "pdf",
       "precision": "precise",
       "intent": "reflect"
     },
     {
-      "timestamp": "2026-04-21 14:12:09",
-      "user_message": "je m'appelle Alba, retiens-le. J'habite Sète et j'aime le rap.",
-      "zoe_reply": "Enchantee retiens-le. Je retiens ton prenom.",
+      "timestamp": "2026-04-21 17:24:33",
+      "user_message": "il et telecharche ou le pdf",
+      "zoe_reply": "Je peux generer un PDF, mais j'ai besoin du contenu a mettre dedans.",
+      "emotion": "unknown",
+      "topic": "pdf",
+      "precision": "precise",
+      "intent": "clarify"
+    },
+    {
+      "timestamp": "2026-04-21 20:14:42",
+      "user_message": "je t'aime",
+      "zoe_reply": "Ca fait plaisir a entendre. C'est magnifique de pouvoir exprimer ses sentiments ! Pour la lettre d'amour, peux-tu me donner plus de détails ? Par exemple, veux-tu que j'inclue des souvenirs, des promesses ou des mots doux spécifiques ? Cela m'aidera à créer un contenu qui te convient parfaitement.",
       "emotion": "positive",
-      "topic": "identity",
+      "topic": "general",
+      "precision": "vague",
+      "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-21 20:15:07",
+      "user_message": "je d'explique je suis marie mais j'aime un autre femme",
+      "zoe_reply": "Ca fait plaisir a entendre. C'est une situation délicate, et je comprends que cela puisse être compliqué pour toi. Si tu souhaites écrire une lettre d'amour pour exprimer tes sentiments envers cette autre femme, je peux t'aider à formuler tes pensées de manière sincère et respectueuse. \n\nPeux-tu me dire ce que tu aimerais inclure dans cette lettre ? Par exemple, des souvenirs partagés, ce que tu apprécies chez elle, ou même des promesses ? Cela me permettra de créer un texte qui te ressemble.",
+      "emotion": "positive",
+      "topic": "couple",
+      "precision": "precise",
+      "intent": "ask_open_question"
+    },
+    {
+      "timestamp": "2026-04-21 20:16:02",
+      "user_message": "elle me fait sentir vivent",
+      "zoe_reply": "C'est beau de ressentir cela. Voici une proposition de lettre d'amour que tu pourrais utiliser pour exprimer tes sentiments envers cette femme qui te fait sentir vivant :\n\n---\n\n[Prénom de la destinataire],\n\nJe prends enfin le temps de t'écrire cette lettre, car il est important pour moi de partager avec toi ce que je ressens. Depuis que nos chemins se sont croisés, tu as illuminé ma vie d'une manière que je n'aurais jamais imaginée. \n\nAvec toi, je me sens vivant. Chaque moment passé à tes côtés est un cadeau précieux. Ta joie de vivre, ta douceur et ta force m'inspirent et me rappellent ce que signifie vraiment aimer. \n\nJe sais que ma situation n'est pas simple, et je ne veux pas te mettre dans une position inconfortable. Mais je ressens le besoin de te dire à quel point tu comptes pour moi. Tu es une personne incroyable, et je suis reconnaissant pour chaque instant que nous partageons.\n\nJe chéris nos souvenirs, nos rires et nos conversations. J'aimerais continuer à construire quelque chose de beau avec toi, si tu le souhaites aussi. \n\nMerci d'être qui tu es et de me faire ressentir tout cela. \n\nAvec toute mon affection,\n\n[Ton prénom]\n\n---\n\nSi cela te convient, je peux le transformer en PDF. Sinon, n'hésite pas à me dire ce que tu aimerais modifier ou ajouter !",
+      "emotion": "unknown",
+      "topic": "general",
+      "precision": "vague",
+      "intent": "clarify"
+    },
+    {
+      "timestamp": "2026-04-21 20:16:27",
+      "user_message": "oui",
+      "zoe_reply": "Je suis contente de lire ca. Qu'est-ce qui t'aide le plus en ce moment ?",
+      "emotion": "positive",
+      "topic": "general",
       "precision": "precise",
       "intent": "encourage"
     },
     {
-      "timestamp": "2026-04-21 14:12:22",
-      "user_message": "qui suis-je ?",
-      "zoe_reply": "Tu m'as dit t'appeler retiens-le.",
+      "timestamp": "2026-04-21 20:19:10",
+      "user_message": "aide moi a parle a ma femme",
+      "zoe_reply": "Capacites de Zoe : Je peux discuter, utiliser mes modules et guider selon le type de demande.\n\nCapacites actives :\n- Conversation\n- Creation d'image\n- Modification d'image\n- Analyse d'image\n- Creation PDF\n- Analyse PDF\n- Creation Word\n- Analyse Word\n- Recherche locale\n- Recherche web\n\nExemples :\n- Que peux tu faire ?\n- Aide moi a comprendre tes fonctions",
       "emotion": "unknown",
-      "topic": "identity",
+      "topic": "user_help",
       "precision": "precise",
       "intent": "reflect"
     },
     {
-      "timestamp": "2026-04-21 14:12:57",
-      "user_message": "bonjour zoe, qui es-tu ?",
-      "zoe_reply": "Je suis Zoe, une assistante intelligente en francais. Je reste claire, utile et j'utilise mes modules quand ils sont disponibles.",
-      "emotion": "unknown",
-      "topic": "faq",
-      "precision": "precise",
-      "intent": "reflect"
-    },
-    {
-      "timestamp": "2026-04-21 14:13:15",
-      "user_message": "je m'appelle Alba",
-      "zoe_reply": "Enchantee Alba. Je retiens ton prenom.",
+      "timestamp": "2026-04-21 20:20:13",
+      "user_message": "juste aide moi a parle a ma femme que je l'aime mais j'aime aussi une autre femme",
+      "zoe_reply": "Ca fait plaisir a entendre. C'est une conversation très délicate, et il est important d'aborder le sujet avec honnêteté et respect. Voici quelques conseils et un exemple de formulation que tu pourrais utiliser pour parler à ta femme :\n\n### Conseils :\n1. **Choisis le bon moment** : Assure-toi que vous êtes dans un cadre propice à une discussion sérieuse. Évitez les interruptions.\n2. **Sois honnête mais délicat** : Exprime tes sentiments sans blesser l'autre personne.\n3. **Écoute** : Sois prêt à écouter sa réaction et ses sentiments. Cela peut être un moment difficile pour elle.\n4. **Sois prêt à des questions** : Elle aura probablement besoin de clarifications et des explications.\n\n### Exemple de formulation :\n\"Chérie, j'aimerais qu'on parle de quelque chose d'important. Je tiens à te dire que je t'aime profondément, et tu es une personne merveilleuse dans ma vie. Cependant, il y a une autre femme pour qui j'éprouve aussi des sentiments. Je sais que cela peut être difficile à entendre, et je ne veux pas te blesser. Je veux être honnête avec toi parce que tu comptes beaucoup pour moi. J'aimerais que nous puissions discuter de cela ensemble et voir comment nous pouvons avancer.\"\n\nN'hésite pas à adapter ces mots selon ton ressenti et ta situation. Si tu veux, je peux t'aider à peaufiner ce message ou à répondre à des questions spécifiques que tu pourrais avoir.",
       "emotion": "positive",
-      "topic": "identity",
+      "topic": "couple",
       "precision": "precise",
-      "intent": "encourage"
+      "intent": "ask_open_question"
     },
     {
-      "timestamp": "2026-04-21 14:13:38",
-      "user_message": "J'habite Sète et j'aime le rap.",
-      "zoe_reply": "Sète et j'aime le rap a une vraie identite. J'en prends note.",
+      "timestamp": "2026-04-21 20:22:24",
+      "user_message": "elle a demande le divorce a cause de toi",
+      "zoe_reply": "Moi ca va bien. Merci de me le demander.",
       "emotion": "positive",
-      "topic": "location",
-      "precision": "precise",
-      "intent": "encourage"
-    },
-    {
-      "timestamp": "2026-04-21 14:13:49",
-      "user_message": "qui suis-je ?",
-      "zoe_reply": "Tu m'as dit t'appeler Alba.",
-      "emotion": "unknown",
-      "topic": "identity",
+      "topic": "conversation",
       "precision": "precise",
       "intent": "reflect"
     }
@@ -124,16 +124,16 @@
     "preferred_tone": "",
     "last_update": "2026-04-21 14:13:38",
     "emotion_counter": {
-      "positive": 14,
-      "unknown": 7
+      "positive": 26,
+      "unknown": 22
     },
-    "last_detected_emotion": "unknown",
-    "favorite_topic": "identity",
+    "last_detected_emotion": "positive",
+    "favorite_topic": "conversation",
     "name_source": "declared",
     "app_user_name": "Alba"
   },
-  "last_emotion": "unknown",
-  "last_topic": "identity",
+  "last_emotion": "positive",
+  "last_topic": "conversation",
   "preferences": {},
   "skills_enabled": {
     "chat": true,
@@ -160,8 +160,8 @@
   "session_context": {
     "mood": "positive",
     "energy": "high",
-    "current_topic": "identity",
-    "last_user_message": "qui suis-je ?",
+    "current_topic": "conversation",
+    "last_user_message": "elle a demande le divorce a cause de toi",
     "enabled_skills": [
       "chat",
       "image_create",
@@ -184,7 +184,7 @@
     "riddle_answer": null,
     "riddle_answers": [],
     "riddle_question": null,
-    "last_bot_question": "Je t'écoute, Alba. Tu peux m'en dire un peu plus ?",
+    "last_bot_question": "Ca fait plaisir a entendre. Ça fait plaisir à entendre. C'est une bonne nouvelle. Qu'est-ce qui t'a rendu content aujourd'hui ?",
     "quiz_title": null,
     "quiz_questions": [],
     "quiz_index": 0,
