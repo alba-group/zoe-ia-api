@@ -2,10 +2,7 @@ import math
 import re
 from typing import Any,
 
-Demandes d'importation de protocole
-
 depuis core.analyzer import normalize_text
-
 
 DEFAULT_PROXIMITY_RADIUS_ METERS = 1500
 MIN_PROXIMITY_RADIUS_METERS = 100
