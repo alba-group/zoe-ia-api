@@ -74,7 +74,6 @@ from core.memory import (
 )
 from core.pdf.pdf_analyzer import analyze_pdf_reply, should_use_pdf_analysis_tool
 from core.pdf.pdf_service import build_pdf_reply, should_use_pdf_tool
-from core.responder import build_final_response
 from core.skills.skill_registry import get_enabled_skills
 from core.thinker import think_about_message
 from core.utils import current_datetime_string
@@ -122,6 +121,8 @@ TASK_SCORE = 70
 HELP_SCORE = 40
 SMALLTALK_SCORE = 20
 FALLBACK_SCORE = 0
+
+TECHNICAL_CHAT_FALLBACK_REPLY = "Je n'ai pas reussi a repondre pour le moment. Reessaie dans un instant."
 
 RELATIONSHIP_KEYWORDS = [
     "femme",
@@ -220,6 +221,37 @@ LOCAL_SEARCH_ACTION_HINTS = {
     "localise",
     "montre moi",
     "donne moi",
+}
+
+PERSONAL_INFO_COMPLEX_MARKERS = {
+    "mais",
+    "parce que",
+    "a cause",
+    "probleme",
+    "besoin de parler",
+    "aide moi",
+    "je suis",
+    "elle a",
+    "il a",
+    "elle m",
+    "il m",
+    "divorce",
+    "rupture",
+    "jalousie",
+    "trahi",
+    "souffre",
+}
+
+PERSONAL_INFO_RELATIONSHIP_MARKERS = {
+    "femme",
+    "mari",
+    "copine",
+    "copain",
+    "autre",
+    "divorce",
+    "rupture",
+    "jalousie",
+    "trahi",
 }
 
 PROTECTED_CHAT_EXACT = {
@@ -1157,6 +1189,18 @@ def _detect_simple_intent(text: str) -> str | None:
 
 
 def _looks_like_phone_action(text: str) -> bool:
+    normalized = _normalize_simple_text(text)
+    if normalized.startswith(
+        (
+            "je m appelle ",
+            "comment je m appelle",
+            "tu t appelles",
+            "comment tu t appelles",
+            "mon prenom c est ",
+        )
+    ):
+        return False
+
     if any(text.startswith(prefix) for prefix in PHONE_ACTION_PREFIXES):
         return True
 
@@ -1762,6 +1806,35 @@ def _extract_personal_info_items(text: str) -> list[dict[str, str]]:
     return extracted_items
 
 
+def _should_capture_personal_info(text: str, extracted_items: list[dict[str, str]]) -> bool:
+    normalized = normalize_text(text)
+    if not normalized or not extracted_items or "?" in text:
+        return False
+
+    if any(re.search(r"\b" + re.escape(marker) + r"\b", normalized) for marker in PERSONAL_INFO_COMPLEX_MARKERS):
+        return False
+
+    if len(extracted_items) > 2 or len(normalized.split()) > 14:
+        return False
+
+    for item in extracted_items:
+        field = str(item.get("field", "")).strip()
+        value = normalize_text(str(item.get("value", "")))
+        if not field or not value:
+            return False
+
+        if field in {"likes", "dislikes"}:
+            if len(value.split()) > 4:
+                return False
+            if any(re.search(r"\b" + re.escape(marker) + r"\b", value) for marker in PERSONAL_INFO_RELATIONSHIP_MARKERS):
+                return False
+
+        if field in {"goals", "projects", "habits"} and len(value.split()) > 6:
+            return False
+
+    return True
+
+
 def _build_personal_info_reply(field: str, value: str) -> tuple[str, str]:
     if field == "name":
         return f"Enchantee {value}. Je retiens ton prenom.", "identity"
@@ -1836,47 +1909,21 @@ def _store_personal_info(memory: dict, field: str, value: str) -> str:
     return str(current_value or value).strip()
 
 
-def _handle_personal_info(text: str, memory: dict) -> dict[str, Any] | None:
+def _handle_personal_info(text: str, memory: dict) -> bool:
     extracted_items = _extract_personal_info_items(text)
-    if not extracted_items:
-        return None
+    if not _should_capture_personal_info(text, extracted_items):
+        return False
 
-    replies: list[str] = []
-    topics: list[str] = []
+    stored_any = False
 
     for extracted_info in extracted_items:
         field = extracted_info["field"]
         stored_value = _store_personal_info(memory, field, extracted_info["value"])
         if not stored_value:
             continue
+        stored_any = True
 
-        reply, topic = _build_personal_info_reply(field, stored_value)
-        if reply and reply not in replies:
-            replies.append(reply)
-        if topic:
-            topics.append(topic)
-
-    if not replies:
-        return None
-
-    reply = " ".join(replies)
-    topic = topics[0] if topics else "profile"
-    if len(set(topics)) > 1:
-        topic = "profile"
-
-    if reply.endswith("?"):
-        set_last_bot_question(memory, reply, "general_followup")
-    else:
-        clear_waiting_flag(memory)
-
-    _save_exchange(memory, text, reply, "positive", topic, "precise", "encourage")
-    return {
-        "emotion": "positive",
-        "precision": "precise",
-        "topic": topic,
-        "intent": "encourage",
-        "reply": reply,
-    }
+    return stored_any
 
 
 def _get_zoe_identity() -> dict[str, Any]:
@@ -2297,42 +2344,7 @@ def _is_deep_emotional_message(text: str, analysis: dict) -> bool:
 
 
 def _should_attempt_llm(user_input: str, analysis: dict) -> bool:
-    if user_input.strip().startswith("/"):
-        return False
-
-    text = user_input.strip()
-    lower = normalize_text(text)
-    word_count = len(text.split())
-    emotion = analysis.get("emotion", "unknown")
-    precision = analysis.get("precision", "vague")
-    topic = analysis.get("topic", "general")
-
-    if _is_deep_emotional_message(text, analysis):
-        return True
-
-    if word_count <= 4 and emotion != "unknown":
-        return False
-
-    if "?" in text:
-        return True
-
-    if any(
-        marker in lower
-        for marker in {
-            "pourquoi",
-            "comment",
-            "peux tu",
-            "tu peux",
-            "que penses tu",
-            "qu est ce que tu penses",
-        }
-    ):
-        return True
-
-    if emotion == "unknown" or topic in {"affection", "gratitude", "support"}:
-        return True
-
-    return precision == "precise" and word_count >= 8
+    return not user_input.strip().startswith("/")
 
 
 def _call_llm_reply(user_input: str, memory: dict) -> dict | None:
@@ -2546,31 +2558,6 @@ def _handle_contextual_reply(text: str, memory: dict) -> dict | None:
 
         clear_waiting_flag(memory)
 
-    if qtype in {"emotional_followup", "general_followup"}:
-        if lower in {"oui", "oui un peu", "un peu", "ca va un peu mieux", "mieux"}:
-            clear_waiting_flag(memory)
-            reply = "Je suis contente de lire ca. Qu'est-ce qui t'aide le plus en ce moment ?"
-            _save_exchange(memory, text, reply, "positive", "general", "precise", "encourage")
-            return {
-                "emotion": "positive",
-                "precision": "precise",
-                "topic": "general",
-                "intent": "encourage",
-                "reply": reply,
-            }
-
-        if lower in {"non", "pas trop", "toujours pas", "non pas vraiment"}:
-            clear_waiting_flag(memory)
-            reply = "D'accord. On peut prendre le temps. Qu'est-ce qui te pese le plus maintenant ?"
-            _save_exchange(memory, text, reply, "negative", "general", "precise", "support")
-            return {
-                "emotion": "negative",
-                "precision": "precise",
-                "topic": "general",
-                "intent": "support",
-                "reply": reply,
-            }
-
     return None
 
 
@@ -2583,9 +2570,17 @@ def _direct_rules(text: str, memory: dict) -> dict | None:
     if profile_command_result is not None:
         return profile_command_result
 
-    profile_question_result = _handle_profile_question(text, memory)
-    if profile_question_result is not None:
-        return profile_question_result
+    if _looks_like_riddle_request(plain_lower):
+        result = _start_riddle_session(memory)
+        _save_exchange(memory, text, result["reply"], "positive", "fun", "precise", "encourage")
+        return result
+
+    if _looks_like_quiz_request(plain_lower):
+        result = _start_quiz_session(memory)
+        _save_exchange(memory, text, result["reply"], "positive", "fun", "precise", "encourage")
+        return result
+
+    return None
 
     simple_intent = _detect_simple_intent(text)
 
@@ -2983,7 +2978,7 @@ def process_user_message(
         attached_pdf_path=attached_pdf_path,
         latitude=latitude,
         longitude=longitude,
-        debug=True,
+        debug=False,
     )
     sensitive_priority_message = routing_decision["intent"] in {
         ROUTING_INTENT_RELATIONSHIP_SUPPORT,
@@ -2994,28 +2989,12 @@ def process_user_message(
     if contextual_result is not None:
         return contextual_result
 
-    personal_info_result = _handle_personal_info(text, memory)
-    if personal_info_result is not None:
-        return personal_info_result
+    _handle_personal_info(text, memory)
 
     if not sensitive_priority_message:
         direct_result = _direct_rules(text, memory)
         if direct_result is not None:
             return direct_result
-
-    if not sensitive_priority_message:
-        local_knowledge_result = _build_local_knowledge_result(text, memory)
-        if local_knowledge_result is not None:
-            _save_exchange(
-                memory=memory,
-                user_text=text,
-                reply=local_knowledge_result["reply"],
-                emotion=local_knowledge_result["emotion"],
-                topic=local_knowledge_result["topic"],
-                precision=local_knowledge_result["precision"],
-                intent=local_knowledge_result["intent"],
-            )
-            return local_knowledge_result
 
     detected_intent = classify_intent(
         text,
@@ -3455,21 +3434,9 @@ def process_user_message(
         memory=memory,
     )
 
-    llm_result = None
-    if _should_attempt_llm(text, analysis):
-        llm_result = _call_llm_reply(text, memory)
-
-    llm_reply = llm_result["reply"] if llm_result and llm_result.get("reply") else None
-
-    reply = build_final_response(
-        analysis=analysis,
-        model_reply=llm_reply,
-        memory=memory,
-        thought=thought,
-    )
-    reply = _merge_memory_hint(reply, _build_profile_memory_hint(text, memory))
-    reply = _apply_session_humanity(reply, memory, analysis)
-    reply = _avoid_repetitive_reply(reply, memory, analysis)
+    llm_result = _call_llm_reply(text, memory) if _should_attempt_llm(text, analysis) else None
+    llm_reply = llm_result["reply"] if llm_result and llm_result.get("reply") else ""
+    reply = llm_reply.strip() or TECHNICAL_CHAT_FALLBACK_REPLY
 
     if reply.endswith("?"):
         set_last_bot_question(memory, reply, "general_followup")

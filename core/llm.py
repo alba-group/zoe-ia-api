@@ -4,7 +4,6 @@ from typing import Any
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from core.analyzer import analyze_text
 from core.config import (
     LLM_HISTORY_LIMIT,
     MODEL_NAME,
@@ -12,11 +11,12 @@ from core.config import (
     OPENAI_TIMEOUT_SECONDS,
 )
 from core.memory import get_last_messages, get_profile, get_session_context
-from core.responder import build_final_response
-from core.thinker import think_about_message
 
 
 load_dotenv()
+
+LLM_TEMPORARY_FAILURE_REPLY = "Je n'ai pas reussi a repondre pour le moment. Reessaie dans un instant."
+LLM_UNAVAILABLE_REPLY = "Le service de reponse est temporairement indisponible."
 
 
 def build_memory_context(memory: dict) -> str:
@@ -101,31 +101,14 @@ def build_memory_context(memory: dict) -> str:
     return "\n".join(parts).strip()
 
 
-def generate_fallback_reply(user_message: str, memory: dict) -> str:
-    analysis = analyze_text(user_message, memory=memory)
-    thought = think_about_message(
-        user_input=user_message,
-        analysis=analysis,
-        memory=memory,
-    )
-    local_reply = build_final_response(
-        analysis=analysis,
-        model_reply=None,
-        memory=memory,
-        thought=thought,
-    ).strip()
-
-    prefix = "Je fonctionne en mode local pour l'instant."
-    if local_reply:
-        return f"{prefix} {local_reply}".strip()
-
-    return prefix
+def generate_fallback_reply() -> str:
+    return LLM_TEMPORARY_FAILURE_REPLY
 
 
 def generate_llm_reply(user_message: str, memory: dict, system_prompt: str) -> str:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     if not api_key:
-        return generate_fallback_reply(user_message, memory)
+        return LLM_UNAVAILABLE_REPLY
 
     try:
         client = OpenAI(
@@ -150,10 +133,10 @@ def generate_llm_reply(user_message: str, memory: dict, system_prompt: str) -> s
         if isinstance(content, str) and content.strip():
             return content.strip()
 
-        return generate_fallback_reply(user_message, memory)
+        return generate_fallback_reply()
 
     except Exception:
-        return generate_fallback_reply(user_message, memory)
+        return generate_fallback_reply()
 
 
 def _build_chat_messages(

@@ -594,7 +594,7 @@ async def chat(payload: ChatRequest, request: Request) -> ChatResponse:
         )
 
         return ChatResponse(
-            reply=result.get("reply", "Je t'ecoute."),
+            reply=result.get("reply", "Je n'ai pas reussi a repondre pour le moment. Reessaie dans un instant."),
             emotion=result.get("emotion", "unknown"),
             precision=result.get("precision", "vague"),
             topic=result.get("topic", "general"),
