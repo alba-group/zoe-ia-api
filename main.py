@@ -5,7 +5,6 @@ from core.utils import (
     log_event,
 )
 
-
 APP_NAME = "Zoe"
 APP_VERSION = "1.0"
 
@@ -70,6 +69,7 @@ def print_memory_summary(memory: dict) -> None:
             print(f"Zoe  : {zoe_reply}")
     else:
         print("\nAucun échange enregistré.")
+
     print("-" * 70)
 
 
@@ -85,6 +85,7 @@ def clear_conversation(memory: dict) -> dict:
         "riddle_question": None,
         "last_bot_question": None,
     }
+
     save_memory(memory)
     log_event("Historique vidé par l'utilisateur.")
     print("\nHistorique vidé. Zoe repart sur une base propre.")
@@ -169,4 +170,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main() 
+    main()

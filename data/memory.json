@@ -1,24 +1,6 @@
 {
   "history": [
     {
-      "timestamp": "2026-04-18 18:36:02",
-      "user_message": "salut",
-      "zoe_reply": "Salut. Je suis contente de te revoir.",
-      "emotion": "positive",
-      "topic": "general",
-      "precision": "vague",
-      "intent": "encourage"
-    },
-    {
-      "timestamp": "2026-04-18 18:36:02",
-      "user_message": "salut",
-      "zoe_reply": "Salut. Je suis contente de te revoir.",
-      "emotion": "positive",
-      "topic": "general",
-      "precision": "vague",
-      "intent": "encourage"
-    },
-    {
       "timestamp": "2026-04-18 18:36:08",
       "user_message": "ca va",
       "zoe_reply": "Oui, ça va bien. Merci. Et toi, comment tu te sens aujourd'hui ?",
@@ -53,18 +35,105 @@
       "topic": "general",
       "precision": "precise",
       "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-21 13:28:19",
+      "user_message": "bonjour zoe",
+      "zoe_reply": "Salut. Je suis contente de te revoir.",
+      "emotion": "positive",
+      "topic": "general",
+      "precision": "vague",
+      "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-21 13:29:20",
+      "user_message": "je m'appelle Alba",
+      "zoe_reply": "Enchantee Alba. Je retiens ton prenom.",
+      "emotion": "positive",
+      "topic": "identity",
+      "precision": "precise",
+      "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-21 13:29:31",
+      "user_message": "comment je m'appelle ?",
+      "zoe_reply": "Tu m'as dit t'appeler Alba.",
+      "emotion": "unknown",
+      "topic": "identity",
+      "precision": "precise",
+      "intent": "reflect"
+    },
+    {
+      "timestamp": "2026-04-21 13:30:34",
+      "user_message": "comment je m'appelle ?",
+      "zoe_reply": "Tu m'as dit t'appeler Alba.",
+      "emotion": "unknown",
+      "topic": "identity",
+      "precision": "precise",
+      "intent": "reflect"
+    },
+    {
+      "timestamp": "2026-04-21 13:32:00",
+      "user_message": "j'habite Sète",
+      "zoe_reply": "Sète a une vraie identite. J'en prends note.",
+      "emotion": "positive",
+      "topic": "location",
+      "precision": "precise",
+      "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-21 13:32:10",
+      "user_message": "je travaille dans l'aide à domicile",
+      "zoe_reply": "C'est un metier humain et precieux. Je retiens ca.",
+      "emotion": "positive",
+      "topic": "work",
+      "precision": "precise",
+      "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-21 13:32:20",
+      "user_message": "j'aime le rap",
+      "zoe_reply": "Le rap a beaucoup de styles. Tu ecoutes quoi en ce moment ?",
+      "emotion": "positive",
+      "topic": "preferences",
+      "precision": "precise",
+      "intent": "encourage"
+    },
+    {
+      "timestamp": "2026-04-21 13:32:31",
+      "user_message": "mon projet est de créer une IA",
+      "zoe_reply": "Je t'écoute, Alba. Tu peux m'en dire un peu plus ?",
+      "emotion": "unknown",
+      "topic": "projet",
+      "precision": "vague",
+      "intent": "clarify"
     }
   ],
   "profile": {
-    "name": "",
+    "name": "Alba",
+    "city": "Sète",
+    "job": "l'aide à domicile",
+    "likes": [
+      "rap"
+    ],
+    "dislikes": [],
+    "projects": [],
+    "goals": [],
+    "important_people": [],
+    "habits": [],
+    "preferred_tone": "",
+    "last_update": "2026-04-21 13:32:20",
     "emotion_counter": {
-      "positive": 6
+      "positive": 11,
+      "unknown": 3
     },
-    "last_detected_emotion": "positive",
-    "favorite_topic": "general"
+    "last_detected_emotion": "unknown",
+    "favorite_topic": "projet",
+    "name_source": "declared",
+    "app_user_name": "Alba"
   },
-  "last_emotion": "positive",
-  "last_topic": "general",
+  "last_emotion": "unknown",
+  "last_topic": "projet",
   "preferences": {},
   "skills_enabled": {
     "chat": true,
@@ -81,8 +150,44 @@
   },
   "known_locations": [],
   "trusted_facts": {
+    "declared_name": "Alba",
+    "profile_city": "Sète",
+    "profile_job": "l'aide à domicile",
+    "profile_likes": [
+      "rap"
+    ]
   },
   "session_context": {
+    "mood": "positive",
+    "energy": "high",
+    "current_topic": "projet",
+    "last_user_message": "mon projet est de créer une IA",
+    "enabled_skills": [
+      "chat",
+      "image_create",
+      "image_edit",
+      "image_analyze",
+      "pdf_create",
+      "pdf_analyze",
+      "docx_create",
+      "docx_analyze",
+      "gps_local_search",
+      "web_search",
+      "code_generation"
+    ]
   },
-  "long_term_memory": []
+  "long_term_memory": [],
+  "context": {
+    "mode": null,
+    "last_question_type": "general_followup",
+    "awaiting_user_reply": true,
+    "riddle_answer": null,
+    "riddle_answers": [],
+    "riddle_question": null,
+    "last_bot_question": "Je t'écoute, Alba. Tu peux m'en dire un peu plus ?",
+    "quiz_title": null,
+    "quiz_questions": [],
+    "quiz_index": 0,
+    "quiz_score": 0
+  }
 }
