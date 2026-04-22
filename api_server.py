@@ -28,6 +28,8 @@ from core.config import (
     MAX_USER_MESSAGE_LENGTH,
     MODEL_NAME,
     OPENAI_API_KEY,
+    OPENAI_MAX_RETRIES,
+    OPENAI_TIMEOUT_SECONDS,
     PDF_DIR,
     validate_config,
 )
@@ -397,6 +399,15 @@ async def lifespan(_: FastAPI):
 
     for warning in validate_config():
         logger.warning(warning)
+
+    logger.info(
+        "OpenAI backend key_present=%s key_prefix=%s model=%s timeout=%s retries=%s",
+        bool(OPENAI_API_KEY),
+        f"{OPENAI_API_KEY[:7]}..." if OPENAI_API_KEY else "",
+        MODEL_NAME,
+        OPENAI_TIMEOUT_SECONDS,
+        OPENAI_MAX_RETRIES,
+    )
 
     logger.info("Demarrage de %s %s", API_TITLE, APP_VERSION)
     log_event("Demarrage API FastAPI.")

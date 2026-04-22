@@ -1,10 +1,13 @@
+import logging
 import os
+import traceback
 from typing import Any
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
 from core.config import (
+    BASE_DIR,
     LLM_HISTORY_LIMIT,
     MODEL_NAME,
     OPENAI_MAX_RETRIES,
@@ -13,10 +16,19 @@ from core.config import (
 from core.memory import get_last_messages, get_profile, get_session_context
 
 
-load_dotenv()
+load_dotenv(dotenv_path=BASE_DIR / ".env")
+
+logger = logging.getLogger("zoe.llm")
 
 LLM_TEMPORARY_FAILURE_REPLY = "Je n'ai pas reussi a repondre pour le moment. Reessaie dans un instant."
 LLM_UNAVAILABLE_REPLY = "Le service de reponse est temporairement indisponible."
+
+
+def _mask_api_key(api_key: str) -> str:
+    clean_key = str(api_key or "").strip()
+    if len(clean_key) < 10:
+        return "***" if clean_key else ""
+    return f"{clean_key[:7]}...{clean_key[-4:]}"
 
 
 def build_memory_context(memory: dict) -> str:
@@ -107,7 +119,16 @@ def generate_fallback_reply() -> str:
 
 def generate_llm_reply(user_message: str, memory: dict, system_prompt: str) -> str:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    logger.info(
+        "openai key_present=%s key_mask=%s model=%s timeout=%s retries=%s",
+        bool(api_key),
+        _mask_api_key(api_key),
+        MODEL_NAME,
+        OPENAI_TIMEOUT_SECONDS,
+        OPENAI_MAX_RETRIES,
+    )
     if not api_key:
+        logger.error("openai missing_api_key dotenv_loaded=%s", (BASE_DIR / '.env').exists())
         return LLM_UNAVAILABLE_REPLY
 
     try:
@@ -122,6 +143,12 @@ def generate_llm_reply(user_message: str, memory: dict, system_prompt: str) -> s
             memory=memory,
             system_prompt=system_prompt,
         )
+        logger.info(
+            "openai call_started endpoint=chat.completions model=%s messages=%s user_chars=%s",
+            MODEL_NAME,
+            len(messages),
+            len(user_message.strip()),
+        )
 
         response = client.chat.completions.create(
             model=MODEL_NAME,
@@ -129,13 +156,34 @@ def generate_llm_reply(user_message: str, memory: dict, system_prompt: str) -> s
             temperature=0.6,
         )
 
+        logger.info(
+            "openai response_received model=%s choices=%s id=%s",
+            MODEL_NAME,
+            len(response.choices or []),
+            getattr(response, "id", ""),
+        )
         content = response.choices[0].message.content if response.choices else ""
         if isinstance(content, str) and content.strip():
             return content.strip()
 
+        logger.error("openai empty_response model=%s raw_has_choices=%s", MODEL_NAME, bool(response.choices))
         return generate_fallback_reply()
 
-    except Exception:
+    except Exception as exc:
+        status_code = getattr(exc, "status_code", None)
+        body = getattr(exc, "body", None)
+        response_obj = getattr(exc, "response", None)
+        if status_code is None and response_obj is not None:
+            status_code = getattr(response_obj, "status_code", None)
+
+        logger.error(
+            "openai call_failed type=%s status_code=%s message=%s body=%s",
+            type(exc).__name__,
+            status_code,
+            str(exc),
+            body,
+        )
+        logger.error("openai traceback_start\n%sopenai traceback_end", traceback.format_exc())
         return generate_fallback_reply()
 
 
