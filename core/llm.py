@@ -4,7 +4,7 @@ import traceback
 from typing import Any
 
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import APIConnectionError, APITimeoutError, AuthenticationError, OpenAI, RateLimitError
 
 from core.config import (
     BASE_DIR,
@@ -22,6 +22,10 @@ logger = logging.getLogger("zoe.llm")
 
 LLM_TEMPORARY_FAILURE_REPLY = "Je n'ai pas reussi a repondre pour le moment. Reessaie dans un instant."
 LLM_UNAVAILABLE_REPLY = "Le service de reponse est temporairement indisponible."
+LLM_AUTH_FAILURE_REPLY = "Le service de reponse est mal configure pour le moment. Authentification OpenAI refusee."
+LLM_RATE_LIMIT_REPLY = "Le service de reponse est temporairement indisponible a cause d'une limite OpenAI atteinte."
+LLM_TIMEOUT_REPLY = "Le service de reponse met trop de temps a repondre. Reessaie dans un instant."
+LLM_NETWORK_FAILURE_REPLY = "Impossible de joindre le service de reponse pour le moment. Verifie la connexion du backend."
 
 
 def _mask_api_key(api_key: str) -> str:
@@ -117,6 +121,22 @@ def generate_fallback_reply() -> str:
     return LLM_TEMPORARY_FAILURE_REPLY
 
 
+def _reply_for_openai_exception(exc: Exception, status_code: int | None = None) -> str:
+    if isinstance(exc, AuthenticationError) or status_code == 401:
+        return LLM_AUTH_FAILURE_REPLY
+
+    if isinstance(exc, RateLimitError) or status_code == 429:
+        return LLM_RATE_LIMIT_REPLY
+
+    if isinstance(exc, APITimeoutError):
+        return LLM_TIMEOUT_REPLY
+
+    if isinstance(exc, APIConnectionError):
+        return LLM_NETWORK_FAILURE_REPLY
+
+    return generate_fallback_reply()
+
+
 def generate_llm_reply(user_message: str, memory: dict, system_prompt: str) -> str:
     api_key = os.getenv("OPENAI_API_KEY", "").strip()
     logger.info(
@@ -184,7 +204,9 @@ def generate_llm_reply(user_message: str, memory: dict, system_prompt: str) -> s
             body,
         )
         logger.error("openai traceback_start\n%sopenai traceback_end", traceback.format_exc())
-        return generate_fallback_reply()
+        technical_reply = _reply_for_openai_exception(exc, status_code=status_code)
+        logger.error("openai mapped_reply=%s", technical_reply)
+        return technical_reply
 
 
 def _build_chat_messages(
